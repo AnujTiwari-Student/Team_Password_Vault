@@ -1,6 +1,6 @@
-import { AuthSchema } from "@/schema/zod-schema";
+import { LoginSchema } from "@/schema/zod-schema";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useSession } from "next-auth/react";
+// import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import React from "react";
 import { useForm } from "react-hook-form";
@@ -11,13 +11,14 @@ import { Button } from "../ui/button";
 import { FormError } from "./form-error";
 import { FormSuccess } from "./form-success";
 import { Eye, EyeOff } from "lucide-react";
+import Link from "next/link";
 
-type AuthFormValues = z.infer<typeof AuthSchema>;
+type AuthFormValues = z.infer<typeof LoginSchema>;
 
 function LoginForm() {
 
     const router = useRouter();
-    const { update } = useSession();
+    // const { update } = useSession();
     
     const [showPassword, setShowPassword] = React.useState(false);  
     const [error, setError] = React.useState<string | null>(null);
@@ -26,7 +27,7 @@ function LoginForm() {
     const [isPending, startTransition] = React.useTransition();
 
     const form = useForm<AuthFormValues>({
-        resolver: zodResolver(AuthSchema),
+        resolver: zodResolver(LoginSchema),
         defaultValues: {
             email: "",
             password: "",
@@ -50,6 +51,7 @@ function LoginForm() {
                                         <Input
                                             {...field}
                                             type="email"
+                                            className="text-white"
                                         />
                                     </FormControl>
                                     <FormMessage />
@@ -70,7 +72,7 @@ function LoginForm() {
                                             <Input
                                                 {...field}
                                                 type={showPassword ? 'text' : 'password'}
-                                                className="pr-10"
+                                                className="pr-10 text-white"
                                             />
                                             <div
                                                 onClick={() => setShowPassword(!showPassword)}
@@ -90,7 +92,7 @@ function LoginForm() {
                     <Button
                         type="submit"
                         size="lg"
-                        className={`w-full flex items-center justify-center gap-2 ${!isPending ? 'text-[#949494]' : 'text-[#bfbfbf]'}`}
+                        className={`w-full flex items-center justify-center gap-2 ${!isPending ? 'text-black' : 'text-[#bfbfbf]'}`}
                         variant="outline"
                     >
                         Login
@@ -99,5 +101,6 @@ function LoginForm() {
             </Form>
         </div>
     )
-
 }
+
+export default LoginForm

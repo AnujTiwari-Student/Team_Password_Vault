@@ -14,10 +14,18 @@ const PasswordField = z.string()
     message: "Password is too common or insecure",
   });
 
-export const AuthSchema = z.object({
+export const LoginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
   password: PasswordField,
   callbackUrl: z.string().optional(),
   csrfToken: z.string().optional(),
 }).strict();
+
+export const RegisterSchema = z.object({
+  email: z.string().email({ message: "Invalid email address" }),
+  password: PasswordField,
+  confirmPassword: z.string(),
+}).strict().refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+})
 
