@@ -25,6 +25,10 @@ export default {
                     
                     const { email, password } = credentials as { email: string; password: string };
 
+                    if(!email || !password) {
+                        return null;
+                    }
+
                 } catch (error) {
                     console.error("Error in authorize:", error);
                     return null;
