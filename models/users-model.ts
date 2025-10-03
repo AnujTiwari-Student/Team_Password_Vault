@@ -24,12 +24,6 @@ const UserSchema = new mongoose.Schema({
         lowercase: true,
     },
 
-    password: {
-        type: String,
-        required: [true, "Password is required"],
-        select: false,
-    },
-
     auth_hash: {
         type: String,
         required: [true, "Authentication hash is required"],

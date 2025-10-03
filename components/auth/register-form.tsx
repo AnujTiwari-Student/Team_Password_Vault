@@ -1,6 +1,5 @@
 import { RegisterSchema } from "@/schema/zod-schema";
 import { zodResolver } from "@hookform/resolvers/zod";
-// import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import React from "react";
 import { useForm } from "react-hook-form";
@@ -11,14 +10,13 @@ import { Button } from "../ui/button";
 import { FormError } from "./form-error";
 import { FormSuccess } from "./form-success";
 import { Eye, EyeOff } from "lucide-react";
-import Link from "next/link";
+import { register } from "@/actions/register";
 
 type AuthFormValues = z.infer<typeof RegisterSchema>;
 
 function RegisterForm() {
 
     const router = useRouter();
-    // const { update } = useSession();
     
     const [showPassword, setShowPassword] = React.useState(false);  
     const [error, setError] = React.useState<string | null>(null);
@@ -35,7 +33,32 @@ function RegisterForm() {
         }
     })
 
-    const handleSubmit = async (data: AuthFormValues) => {}
+    const handleSubmit = async (data: AuthFormValues) => {
+        try {
+            
+            startTransition( async () => {
+                setIsLoading(true);
+                setError(null);
+                setSuccess(null);
+
+                const res = await register(data);
+
+                if (res.success) {
+                    setSuccess(res.message || "Registration successful!");
+                    router.push("/auth/login");
+                } else {
+                    setError(res.errors?._form?.[0] || "Registration failed. Please try again.");
+                }
+
+                setIsLoading(false);
+            })
+
+        } catch (error) {
+            console.error("Registration error:", error);
+            setError("An unexpected error occurred. Please try again.");
+            setIsLoading(false);
+        }
+    }
 
     return (
         <div className='w-full'>
@@ -71,7 +94,7 @@ function RegisterForm() {
                                             <Input
                                                 {...field}
                                                 type={showPassword ? 'text' : 'password'}
-                                                className="pr-10"
+                                                className="pr-10 text-white"
                                             />
                                             <div
                                                 onClick={() => setShowPassword(!showPassword)}
@@ -98,7 +121,7 @@ function RegisterForm() {
                                             <Input
                                                 {...field}
                                                 type={showPassword ? 'text' : 'password'}
-                                                className="pr-10"
+                                                className="pr-10 text-white"
                                             />
                                             <div
                                                 onClick={() => setShowPassword(!showPassword)}
@@ -121,12 +144,12 @@ function RegisterForm() {
                         className={`w-full flex items-center justify-center gap-2 ${!isPending ? 'text-[#949494]' : 'text-[#bfbfbf]'}`}
                         variant="outline"
                     >
-                        Signup
+                        {isLoading || isPending ? 'Registering...' : 'Register'}
                     </Button>
                 </form>
             </Form>
         </div>
     )
-}
+}   
 
 export default RegisterForm;

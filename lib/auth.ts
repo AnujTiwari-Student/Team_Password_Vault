@@ -1,11 +1,11 @@
 import NextAuth, { type NextAuthResult } from "next-auth"
 import { MongoDBAdapter } from "@auth/mongodb-adapter"
 import authConfig from "./auth.config"
-import client from "@/db";
+import clientPromise from "@/db/mongodb-client";
 
 const result = NextAuth({
   ...authConfig,
-  adapter: MongoDBAdapter(client),
+  adapter: MongoDBAdapter(clientPromise),
   secret: process.env.AUTH_SECRET,
 });
 

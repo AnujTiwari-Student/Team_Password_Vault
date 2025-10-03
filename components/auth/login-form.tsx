@@ -12,6 +12,8 @@ import { FormError } from "./form-error";
 import { FormSuccess } from "./form-success";
 import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
+import { login } from "@/actions/login";
+import { toast } from "sonner";
 
 type AuthFormValues = z.infer<typeof LoginSchema>;
 
@@ -34,7 +36,31 @@ function LoginForm() {
         }
     })
 
-    const handleSubmit = async (data: AuthFormValues) => {}
+    const handleSubmit = async (data: AuthFormValues) => {
+        try {
+            startTransition(async () => {
+                setIsLoading(true);
+                setError(null);
+                setSuccess(null);
+
+                const res = await login(data);
+
+                if (res.success) {
+                    setSuccess(res.message || "Login successful!");
+                    toast.success(res.message || "Login successful!");
+                    router.push("/");
+                } else {
+                    setError(res.errors?._form?.[0] || "Login failed. Please try again.");
+                }
+
+                setIsLoading(false);
+            })
+        } catch (error) {
+            console.error("Registration error:", error);
+            setError("An unexpected error occurred. Please try again.");
+            setIsLoading(false);
+        }
+    }
 
     return (
         <div className='w-full'>
@@ -95,7 +121,7 @@ function LoginForm() {
                         className={`w-full flex items-center justify-center gap-2 ${!isPending ? 'text-black' : 'text-[#bfbfbf]'}`}
                         variant="outline"
                     >
-                        Login
+                        {isPending || isLoading ? 'Logging in...' : 'Login'}
                     </Button>
                 </form>
             </Form>
