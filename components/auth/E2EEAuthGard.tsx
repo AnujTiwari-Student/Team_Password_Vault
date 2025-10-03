@@ -1,3 +1,4 @@
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useSession } from "next-auth/react";
 import { usePathname, useRouter } from "next/navigation";
 import React, { useEffect } from "react";
@@ -9,10 +10,10 @@ export default function E2EEAuthGuard({ children }: { children: React.ReactNode 
   const router = useRouter();
   const pathname = usePathname();
 
+  const user = useCurrentUser();
+
   useEffect(() => {
     if (status === "loading") return;
-
-    const user = session?.user as any;
     
     const isSetupRequired = user && !user.masterPassphraseSetupComplete;
     const isSetupPage = pathname === SETUP_PATH;

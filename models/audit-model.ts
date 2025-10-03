@@ -140,7 +140,7 @@ const AuditSchema = new mongoose.Schema<IAudit>({
 export interface IInvite extends Document {
     org_id: mongoose.Types.ObjectId;
     email: string;
-    role: MemberRole; // Using the same roles as IMembership
+    role: MemberRole; 
     token: string;
     expires_at: Date;
     invited_by: mongoose.Types.ObjectId;

@@ -1,10 +1,9 @@
 "use server";
 
 import { getUserByEmail } from "@/data/users-data";
-import { generateUmkSalt, hashAuthPassword } from "@/lib/password-hash";
-import UserModel from "@/models/users-model";
+import { prisma } from "@/db";
+import { hashAuthPassword } from "@/lib/password-hash";
 import { RegisterSchema } from "@/schema/zod-schema";
-import { withDB } from "@/utils/db-action";
 import * as z from "zod";
 
 type RegisterActionState = {
@@ -25,7 +24,6 @@ type RegisterActionState = {
 export const register = async (
   data: z.infer<typeof RegisterSchema>
 ): Promise<RegisterActionState> => {
-  return withDB(async () => {
     const validatedFields = RegisterSchema.safeParse(data);
 
     if (!validatedFields.success) {
@@ -67,24 +65,20 @@ export const register = async (
       };
     }
 
-    const newUser = await UserModel.create({
-      email,
-      auth_hash: hashedPassword,
-      auth_provider: "credentials",
-      umk_salt: null,
-      master_passphrase_verifier: null,
-      twofa_enabled: false,
-      public_key: null,
-      last_login: null,
+    const newUser = await prisma.user.create({
+      data: {
+        email,
+        auth_hash: hashedPassword,
+        auth_provider: "credentials",
+      }
     });
 
     return {
       success: true,
       message: "User registered successfully",
       user: {
-        id: newUser._id!.toString(),
+        id: newUser.id!.toString(),
         email: newUser.email,
       },
     };
-  });
 };

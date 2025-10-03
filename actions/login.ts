@@ -25,7 +25,6 @@ type LoginActionState = {
 };
 
 export const login = async (data: z.infer<typeof LoginSchema>): Promise<LoginActionState> => {
-    return withDB(async () => {
         const validatedFields = LoginSchema.safeParse(data);
 
         if (!validatedFields.success) {
@@ -76,9 +75,8 @@ export const login = async (data: z.infer<typeof LoginSchema>): Promise<LoginAct
             success: true,
             message: "Login successful",
             user: {
-                id: existingUser._id!.toString(),
+                id: existingUser.id!.toString(),
                 email: existingUser.email,
             },
         };
-    })
 }

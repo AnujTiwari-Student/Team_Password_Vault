@@ -1,0 +1,233 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// ===========================
+// ENUMS
+// ===========================
+
+enum AuthProvider {
+  credentials
+  oauth
+  sso
+}
+
+enum MemberRole {
+  owner
+  admin
+  member
+  viewer
+}
+
+enum ItemType {
+  login
+  note
+  totp
+}
+
+enum ShareTargetType {
+  vault
+  item
+}
+
+enum ShareGranteeType {
+  user
+  role
+}
+
+enum AuditSubjectType {
+  org
+  vault
+  item
+  member
+  invite
+}
+
+// ===========================
+// MODELS
+// ===========================
+
+model User {
+  id                         String       @id @default(auto()) @map("_id") @db.ObjectId
+  email                      String       @unique
+  name                       String?
+  image                      String?
+  emailVerified              DateTime?
+  auth_hash                  String?      @db.String
+  auth_provider              AuthProvider @default(credentials)
+  umk_salt                   String?      @db.String
+  master_passphrase_verifier String?      @db.String
+  twofa_enabled              Boolean      @default(false)
+  public_key                 String?
+  created_at                 DateTime     @default(now())
+  last_login                 DateTime?
+
+  // Relations
+  accounts    Account[]
+  orgs        Org[]        @relation("OrgOwner")
+  memberships Membership[]
+  items       Item[]       @relation("ItemCreator")
+  shares      Share[]      @relation("ShareGranteeUser")
+  audits      Audit[]      @relation("AuditActor")
+  invitesSent Invite[]     @relation("InvitedBy")
+
+  @@map("users")
+}
+
+model Account {
+  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId             String  @map("user_id") @db.ObjectId
+  type               String
+  provider           String
+  providerAccountId  String  @map("provider_account_id")
+  refresh_token      String? 
+  access_token       String? 
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String? 
+  session_state      String?
+ 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Org {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  owner_user_id String   @db.ObjectId
+  created_at    DateTime @default(now())
+
+  // Relations
+  owner       User         @relation("OrgOwner", fields: [owner_user_id], references: [id])
+  memberships Membership[]
+  vaults      Vault[]
+  invites     Invite[]
+  audits      Audit[]
+
+  @@map("orgs")
+}
+
+model Membership {
+  id                   String     @id @default(auto()) @map("_id") @db.ObjectId
+  org_id               String     @db.ObjectId
+  user_id              String     @db.ObjectId
+  role                 MemberRole @default(member)
+  ovk_wrapped_for_user String
+  created_at           DateTime   @default(now())
+
+  // Relations
+  org  Org  @relation(fields: [org_id], references: [id])
+  user User @relation(fields: [user_id], references: [id])
+
+  @@map("memberships")
+}
+
+model Vault {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  org_id     String   @db.ObjectId
+  name       String
+  type       String   @default("org")
+  ovk_id     String   @db.ObjectId
+  created_at DateTime @default(now())
+
+  // Relations
+  org    Org     @relation(fields: [org_id], references: [id])
+  items  Item[]
+  shares Share[]
+
+  @@map("vaults")
+}
+
+model Item {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  vault_id         String   @db.ObjectId
+  type             ItemType
+  name             String
+  url              String?
+  username_ct      String?
+  password_ct      String?
+  note_ct          String?
+  totp_seed_ct     String?
+  item_key_wrapped String
+  tags             String[]
+  created_by       String   @db.ObjectId
+  updated_at       DateTime @default(now())
+
+  // Relations
+  vault   Vault @relation(fields: [vault_id], references: [id])
+  creator User  @relation("ItemCreator", fields: [created_by], references: [id])
+
+  @@map("items")
+}
+
+model Share {
+  id           String           @id @default(auto()) @map("_id") @db.ObjectId
+  target_type  ShareTargetType
+  target_id    String           @db.ObjectId
+  grantee_type ShareGranteeType
+  grantee_id   String?          @db.ObjectId
+  role         String?
+  created_at   DateTime         @default(now())
+
+  // Embedded sub-document (permissions)
+  view   Boolean @default(false)
+  edit   Boolean @default(false)
+  share  Boolean @default(false)
+  manage Boolean @default(false)
+
+  // Relations
+  granteeUser User?   @relation("ShareGranteeUser", fields: [grantee_id], references: [id])
+  Vault       Vault?  @relation(fields: [vaultId], references: [id])
+  vaultId     String? @db.ObjectId
+
+  @@map("shares")
+}
+
+model Audit {
+  id            String           @id @default(auto()) @map("_id") @db.ObjectId
+  org_id        String           @db.ObjectId
+  actor_user_id String           @db.ObjectId
+  action        String
+  subject_type  AuditSubjectType
+  subject_id    String?          @db.ObjectId
+  ip            String?
+  ua            String?
+  ts            DateTime         @default(now())
+  meta          Json
+
+  // Relations
+  org   Org  @relation(fields: [org_id], references: [id])
+  actor User @relation("AuditActor", fields: [actor_user_id], references: [id])
+
+  @@map("audits")
+}
+
+model Invite {
+  id         String     @id @default(auto()) @map("_id") @db.ObjectId
+  org_id     String     @db.ObjectId
+  email      String
+  role       MemberRole @default(member)
+  token      String     @unique
+  expires_at DateTime
+  invited_by String     @db.ObjectId
+
+  // Relations
+  org       Org  @relation(fields: [org_id], references: [id])
+  invitedBy User @relation("InvitedBy", fields: [invited_by], references: [id])
+
+  @@map("invites")
+}

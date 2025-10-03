@@ -22,11 +22,12 @@ export default {
                 email: { label: "Email", type: "email" },
                 password: { label: "Password", type: "password" },
             },
+            // @ts-expect-error NextAuth types are incorrect
             authorize: async (credentials) => {
 
                 if(!credentials) {
                     console.error("No credentials provided");
-                    return new Error("No credentials provided");
+                    return null
                 }
 
                 try {
@@ -37,7 +38,7 @@ export default {
                     const validated = LoginSchema.safeParse(authData);
                     if (!validated.success) {
                         console.error("Invalid input schema", validated.error.format());
-                        throw new Error("Invalid email or password format");
+                        return null
                     }
 
                     const { email, password } = validated.data;
@@ -46,19 +47,19 @@ export default {
 
                     if (!existingUser) {
                         console.error("No user found with this email");
-                        throw new Error("No user found with this email");
+                        return null;
                     }
 
-                    const isPasswordValid = await verifyAuthPassword(existingUser.auth_hash, password);
+                    const isPasswordValid = await verifyAuthPassword(existingUser.auth_hash || "", password);
                     if (!isPasswordValid) {
                         console.error("Incorrect password");
-                        throw new Error("Incorrect password");
+                        return null;
                     }
 
                     return {
-                        // @ts-expect-error TS2322
-                        id: existingUser._id.toString(),
+                        id: existingUser.id!.toString(),
                         email: existingUser.email,
+                        masterPassphraseSetupComplete: !!existingUser.master_passphrase_verifier,                        
                     };    
 
                 } catch (error) {
