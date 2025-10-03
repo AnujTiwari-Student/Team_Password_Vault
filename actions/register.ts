@@ -70,6 +70,14 @@ export const register = async (
         email,
         auth_hash: hashedPassword,
         auth_provider: "credentials",
+        name: null,
+        image: null,
+        umk_salt: null,
+        master_passphrase_verifier: null,
+        twofa_enabled: false,
+        emailVerified: null,
+        public_key: null,
+        last_login: null,
       }
     });
 

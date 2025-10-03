@@ -65,7 +65,7 @@ model User {
   image                      String?
   emailVerified              DateTime?
   auth_hash                  String?      @db.String
-  auth_provider              AuthProvider @default(credentials)
+  auth_provider              AuthProvider @default(oauth)
   umk_salt                   String?      @db.String
   master_passphrase_verifier String?      @db.String
   twofa_enabled              Boolean      @default(false)

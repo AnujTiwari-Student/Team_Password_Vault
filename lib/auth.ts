@@ -1,9 +1,9 @@
 import NextAuth, { type NextAuthResult } from "next-auth";
 import authConfig from "./auth.config";
-import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/db";
 import { getAccountByUserId } from "@/data/account-data";
-import { getUserById } from "@/data/users-data";
+import { getUserById, updateUser } from "@/data/users-data";
+import { CustomOAuthAdapter } from "./custom-adapter";
 
 const result = NextAuth({
   ...authConfig,
@@ -11,7 +11,7 @@ const result = NextAuth({
     async linkAccount({ user, account }) {
       console.log(`Account linked: ${account.provider} to user ${user.email}`);
       const userId = user.id as unknown as string;
-      // await updateUser(userId);
+      await updateUser(userId);
     },
   },
   callbacks: {
@@ -58,7 +58,8 @@ const result = NextAuth({
 
     },
   },
-  adapter: PrismaAdapter(prisma),
+  // @ts-expect-error type issue with next-auth and prisma adapter
+  adapter: CustomOAuthAdapter(prisma),
   secret: process.env.AUTH_SECRET,
   session: { strategy: "jwt" },
   pages: {
