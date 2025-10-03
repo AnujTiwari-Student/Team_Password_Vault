@@ -2,6 +2,9 @@ import GitHub from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import type { NextAuthConfig } from "next-auth";
+import { LoginSchema } from "@/schema/zod-schema";
+import { getUserByEmail } from "@/data/users-data";
+import { verifyAuthPassword } from "./password-hash";
 
 
 export default {
@@ -21,20 +24,47 @@ export default {
             },
             authorize: async (credentials) => {
 
+                if(!credentials) {
+                    console.error("No credentials provided");
+                    return new Error("No credentials provided");
+                }
+
                 try {
                     
-                    const { email, password } = credentials as { email: string; password: string };
+                    const { ...authData } = credentials;
+                    console.log("Auth data:", authData);
 
-                    if(!email || !password) {
-                        return null;
+                    const validated = LoginSchema.safeParse(authData);
+                    if (!validated.success) {
+                        console.error("Invalid input schema", validated.error.format());
+                        throw new Error("Invalid email or password format");
                     }
+
+                    const { email, password } = validated.data;
+
+                    const existingUser = await getUserByEmail(email);
+
+                    if (!existingUser) {
+                        console.error("No user found with this email");
+                        throw new Error("No user found with this email");
+                    }
+
+                    const isPasswordValid = await verifyAuthPassword(existingUser.auth_hash, password);
+                    if (!isPasswordValid) {
+                        console.error("Incorrect password");
+                        throw new Error("Incorrect password");
+                    }
+
+                    return {
+                        // @ts-expect-error TS2322
+                        id: existingUser._id.toString(),
+                        email: existingUser.email,
+                    };    
 
                 } catch (error) {
                     console.error("Error in authorize:", error);
                     return null;
                 }
-
-                return null;
             },
         }),
     ],

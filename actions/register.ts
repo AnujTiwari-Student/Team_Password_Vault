@@ -1,5 +1,6 @@
 "use server";
 
+import { getUserByEmail } from "@/data/users-data";
 import { generateUmkSalt, hashAuthPassword } from "@/lib/password-hash";
 import UserModel from "@/models/users-model";
 import { RegisterSchema } from "@/schema/zod-schema";
@@ -45,7 +46,7 @@ export const register = async (
       };
     }
 
-    const existingUser = await UserModel.findOne({ email });
+    const existingUser = await getUserByEmail(email);
     if (existingUser) {
       return {
         success: false,
@@ -66,13 +67,15 @@ export const register = async (
       };
     }
 
-    const umkSalt = generateUmkSalt();
-
     const newUser = await UserModel.create({
       email,
       auth_hash: hashedPassword,
       auth_provider: "credentials",
-      umk_salt: umkSalt,
+      umk_salt: null,
+      master_passphrase_verifier: null,
+      twofa_enabled: false,
+      public_key: null,
+      last_login: null,
     });
 
     return {

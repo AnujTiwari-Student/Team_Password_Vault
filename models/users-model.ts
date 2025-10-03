@@ -26,7 +26,6 @@ const UserSchema = new mongoose.Schema({
 
     auth_hash: {
         type: String,
-        required: [true, "Authentication hash is required"],
         select: false, 
     },
 
@@ -39,7 +38,6 @@ const UserSchema = new mongoose.Schema({
 
     umk_salt: {
         type: String,
-        required: [true, "UMK salt is required for key derivation"],
         select: false,
     },
 

@@ -15,7 +15,7 @@ export default function Login() {
     const searchParams = useSearchParams();
     const error = searchParams.get("error") === "OAuthAccountNotLinked"
         ? "Email already linked with another provider."
-        : null
+        : undefined;
 
     return (
         <main className="flex flex-row w-full h-[100lvh]">
@@ -48,7 +48,7 @@ export default function Login() {
                         <span className="text-[#bfbfbf] text-[12px]">OR LOGIN WITH YOUR EMAIL</span>
                         <div className="border-[#bfbfbf] border-1 w-[74px]"></div>
                     </div>
-                    <LoginForm />
+                    <LoginForm error={error} />
                     <h6 className="text-white">New Here ? <span className="text-blue-500 font-semibold"><Link href="/auth/register">Create an account</Link></span></h6>
                 </div>
             </section>

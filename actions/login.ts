@@ -1,7 +1,8 @@
 "use server";
 
+import { getUserByEmail } from "@/data/users-data";
+import { signIn } from "@/lib/auth";
 import { verifyAuthPassword } from "@/lib/password-hash";
-import UserModel from "@/models/users-model";
 import { LoginSchema } from "@/schema/zod-schema";
 import { withDB } from "@/utils/db-action";
 import * as z from "zod";
@@ -18,6 +19,8 @@ type LoginActionState = {
   user?: {
     id: string;
     email: string;
+    umk_salt?: string;
+    master_passphrase_verifier?: string | null;
   };
 };
 
@@ -34,7 +37,7 @@ export const login = async (data: z.infer<typeof LoginSchema>): Promise<LoginAct
 
         const { email, password } = validatedFields.data;
 
-        const existingUser = await UserModel.findOne({ email }).select('+auth_hash +umk_salt');
+        const existingUser = await getUserByEmail(email);
         if (!existingUser) {
             return {
                 success: false,
@@ -50,6 +53,21 @@ export const login = async (data: z.infer<typeof LoginSchema>): Promise<LoginAct
                 success: false,
                 errors: {
                     password: ["Incorrect password"],
+                },
+            };
+        }
+
+        const signinResult = await signIn("credentials", {
+            redirect: false,
+            email,
+            password,
+        });
+
+        if (signinResult?.error) {
+            return {
+                success: false,
+                errors: {
+                    _form: [signinResult.error || "Login failed. Please try again."],
                 },
             };
         }

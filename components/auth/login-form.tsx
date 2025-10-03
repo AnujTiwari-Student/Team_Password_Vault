@@ -17,7 +17,7 @@ import { toast } from "sonner";
 
 type AuthFormValues = z.infer<typeof LoginSchema>;
 
-function LoginForm() {
+function LoginForm({error: propError}: {error?: string | null}) {
 
     const router = useRouter();
     // const { update } = useSession();
@@ -113,7 +113,7 @@ function LoginForm() {
                             )}
                         />
                     </div>
-                    <FormError message={error} />
+                    <FormError message={error || propError} />
                     <FormSuccess message={success} />
                     <Button
                         type="submit"
