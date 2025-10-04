@@ -4,18 +4,24 @@ import { prisma } from "@/db";
 import { getAccountByUserId } from "@/data/account-data";
 import { getUserById, updateUser } from "@/data/users-data";
 import { CustomOAuthAdapter } from "./custom-adapter";
+import { cookies } from "next/headers";
 
 const result = NextAuth({
   ...authConfig,
   events: {
     async linkAccount({ user, account }) {
+      const cookieStore = await cookies();
+      const roleCookie = cookieStore.get("user-role");
+      const role = roleCookie?.value;
+
       console.log(`Account linked: ${account.provider} to user ${user.email}`);
-      const userId = user.id as unknown as string;
-      await updateUser(userId);
+
+      await updateUser(user.id as string, role);
     },
   },
   callbacks: {
     async session({ session, token }) {
+      
       if (token.sub && session.user) {
         session.user.id = token.sub;
         session.user.email = token.email as string;
@@ -24,23 +30,26 @@ const result = NextAuth({
         session.user.name = token.name as string;
         session.user.image = token.picture as string;
         session.user.twofa_enabled = token.twofa_enabled as boolean;
-      }
-
-      console.log("Session callback - session:", session);
-
-      if (session.user) {
         session.user.masterPassphraseSetupComplete =
           !!token.masterPassphraseSetupComplete;
       }
 
+      if (token.role) {
+        session.user.role = token.role as string;
+      }
+
+      console.log("Session callback - session:", session);
+
       return session;
     },
     async jwt({ token }) {
+      if (!token.sub) return token;
 
-      if(!token.sub) return token;
+      const cookieStore = await cookies();
+      const roleCookie = cookieStore.get("user-role");
 
       const user = await getUserById(token.sub as string);
-      if(!user) return token;
+      if (!user) return token;
 
       const account = await getAccountByUserId(token.sub as string);
 
@@ -50,12 +59,14 @@ const result = NextAuth({
       token.email = user?.email as string;
       token.masterPassphraseSetupComplete = !!user?.master_passphrase_verifier;
       token.twofa_enabled = !!account;
+      if (roleCookie?.value) {
+        token.role = roleCookie.value;
+      }
 
       return {
         ...token,
-        user
+        user,
       };
-
     },
   },
   // @ts-expect-error type issue with next-auth and prisma adapter

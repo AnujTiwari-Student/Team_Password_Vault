@@ -14,6 +14,7 @@ declare module "next-auth" {
       created_at?: Date;
       last_login?: Date | null;
       auth_hash?: string;
+      role?: string;
     } & DefaultSession["user"];
   }
 
@@ -30,6 +31,7 @@ declare module "next-auth" {
       created_at?: Date;
       last_login?: Date | null;
       auth_hash?: string;
+      role?: string;
     } & DefaultSession["user"];
   }
 
@@ -45,5 +47,6 @@ declare module "next-auth" {
     last_login?: Date | null;
     auth_hash?: string;
     email?: string;
+    role?: string;
   }
 }

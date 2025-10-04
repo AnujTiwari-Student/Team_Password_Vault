@@ -5,6 +5,7 @@ import { prisma } from "@/db";
 import { hashAuthPassword } from "@/lib/password-hash";
 import { RegisterSchema } from "@/schema/zod-schema";
 import * as z from "zod";
+import { cookies } from "next/headers";
 
 type RegisterActionState = {
   success: boolean;
@@ -24,69 +25,75 @@ type RegisterActionState = {
 export const register = async (
   data: z.infer<typeof RegisterSchema>
 ): Promise<RegisterActionState> => {
-    const validatedFields = RegisterSchema.safeParse(data);
+  const validatedFields = RegisterSchema.safeParse(data);
 
-    if (!validatedFields.success) {
-      return {
-        success: false,
-        errors: validatedFields.error.flatten().fieldErrors,
-      };
-    }
-
-    const { email, password, confirmPassword } = validatedFields.data;
-
-    if (password !== confirmPassword) {
-      return {
-        success: false,
-        errors: {
-          confirmPassword: ["Passwords do not match"],
-        },
-      };
-    }
-
-    const existingUser = await getUserByEmail(email);
-    if (existingUser) {
-      return {
-        success: false,
-        errors: {
-          email: ["User with this email already exists"],
-        },
-      };
-    }
-
-    const hashedPassword = await hashAuthPassword(password);
-
-    if (!hashedPassword) {
-      return {
-        success: false,
-        errors: {
-          _form: ["An unexpected error occurred. Please try again later."],
-        },
-      };
-    }
-
-    const newUser = await prisma.user.create({
-      data: {
-        email,
-        auth_hash: hashedPassword,
-        auth_provider: "credentials",
-        name: null,
-        image: null,
-        umk_salt: null,
-        master_passphrase_verifier: null,
-        twofa_enabled: false,
-        emailVerified: null,
-        public_key: null,
-        last_login: null,
-      }
-    });
-
+  if (!validatedFields.success) {
     return {
-      success: true,
-      message: "User registered successfully",
-      user: {
-        id: newUser.id!.toString(),
-        email: newUser.email,
+      success: false,
+      errors: validatedFields.error.flatten().fieldErrors,
+    };
+  }
+
+  const { email, password, confirmPassword } = validatedFields.data;
+
+  if (password !== confirmPassword) {
+    return {
+      success: false,
+      errors: {
+        confirmPassword: ["Passwords do not match"],
       },
     };
+  }
+
+  const existingUser = await getUserByEmail(email);
+  if (existingUser) {
+    return {
+      success: false,
+      errors: {
+        email: ["User with this email already exists"],
+      },
+    };
+  }
+
+  const hashedPassword = await hashAuthPassword(password);
+
+  if (!hashedPassword) {
+    return {
+      success: false,
+      errors: {
+        _form: ["An unexpected error occurred. Please try again later."],
+      },
+    };
+  }
+
+  const cookieStore = await cookies();
+  const roleCookie = cookieStore.get("user-role");
+  const role = roleCookie?.value || "owner" || null;
+
+  const newUser = await prisma.user.create({
+    data: {
+      email,
+      auth_hash: hashedPassword,
+      auth_provider: "credentials",
+      name: null,
+      image: null,
+      umk_salt: null,
+      master_passphrase_verifier: null,
+      twofa_enabled: false,
+      email_verified: null,
+      public_key: null,
+      last_login: null,
+      // @ts-expect-error Prisma types are incorrect
+      role,
+    },
+  });
+
+  return {
+    success: true,
+    message: "User registered successfully",
+    user: {
+      id: newUser.id!.toString(),
+      email: newUser.email,
+    },
+  };
 };

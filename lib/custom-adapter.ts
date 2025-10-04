@@ -1,45 +1,59 @@
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { PrismaClient } from "@prisma/client";
-import z from "zod";
+import { AdapterUser } from "@auth/core/adapters";
 
-
-const OAuthUserSchema = z.object({
-    email: z.string().email(),
-    name: z.string().nullable().optional(),
-    image: z.string().url().nullable().optional(),
-    emailVerified: z.date().nullable().optional(),
-    umk_salt: z.string().nullable().optional(),
-    master_passphrase_verifier: z.string().nullable().optional(),
-    public_key: z.string().nullable().optional(),
-    twofa_enabled: z.boolean().default(true),
-    auth_provider: z.enum(['oauth']),
-    auth_hash: z.string().nullable().optional(),
-    last_login: z.date().nullable().optional(),
-})
+type OAuthUser = {
+    id?: string;
+    name: string | null;
+    email: string;
+    email_verified?: Date | null;
+    image?: string | null;
+    auth_provider?: string;
+    auth_hash?: string | null;
+    umk_salt?: string | null;
+    master_passphrase_verifier?: string | null;
+    twofa_enabled?: boolean;
+    public_key?: string | null;
+    last_login?: Date | null;
+}
 
 export const CustomOAuthAdapter = (db: PrismaClient) => {
-    const baseAdapter = PrismaAdapter(db);
+  const baseAdapter = PrismaAdapter(db);
 
-    return {
-        ...baseAdapter,
-        async createUser(user: z.infer<typeof OAuthUserSchema>) {
-            try {
-                
-                const validatedUser = OAuthUserSchema.parse(user);
+  return {
+    ...baseAdapter,
 
-                const newUser = await db.user.create({
-                    data: {
-                        ...validatedUser
-                    }
-                });
+    async createUser(user: OAuthUser & { role?: string }): Promise<AdapterUser> {
+      try {
+        const userRole = user.role || "member";
 
-                return newUser;
+        const userData = {
+          name: user.name,
+          email: user.email,
+          email_verified: user.email_verified || null,
+          image: user.image || null,
+          auth_provider: "oauth",
+          auth_hash: null,
+          umk_salt: user.umk_salt || null,
+          master_passphrase_verifier: user.master_passphrase_verifier || null,
+          twofa_enabled: true,
+          public_key: user.public_key || null,
+          last_login: user.last_login || null,
+          role: userRole,
+        };
 
-            } catch (error) {
-                console.error(`Error creating user via OAuth for ${user.email}:`, error);
-                throw error;
-            }
-        }
-            
-    }
-}
+        const newUser = await db.user.create({
+          data: userData,
+        });
+
+        return {
+          ...user,
+          id: newUser.id.toString(),
+        };
+      } catch (error) {
+        console.error(`Error creating user via OAuth for ${user.email}:`, error);
+        throw error;
+      }
+    },
+  };
+};
