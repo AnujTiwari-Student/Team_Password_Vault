@@ -1,7 +1,7 @@
-import argon2 from "argon2";
-import * as crypto from "crypto";
+"use server";
 
-const UMK_SALT_BYTES = 32;
+
+import argon2 from "argon2";
 
 export async function hashAuthPassword(password: string): Promise<string> {
   return await argon2.hash(password, {
@@ -14,22 +14,4 @@ export async function hashAuthPassword(password: string): Promise<string> {
 
 export async function verifyAuthPassword(hash: string, password: string): Promise<boolean> {
   return await argon2.verify(hash, password);
-}
-
-export function generateUmkSalt(): string {
-  return crypto.randomBytes(UMK_SALT_BYTES).toString('hex');
-}
-
-export function deriveUserMasterKey(password: string, umkSalt: string): Buffer {
-    const iterations = 100000;
-    const keylen = 32;
-    const digest = 'sha512';
-
-    return crypto.pbkdf2Sync(
-        password,
-        Buffer.from(umkSalt, 'hex'),
-        iterations,
-        keylen,
-        digest
-    );
 }

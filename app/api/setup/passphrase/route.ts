@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth"; // Assuming 'auth' is exported here
 import { prisma } from "@/db";
+import { currentUser } from "@/lib/current-user";
 
 export async function POST(request: Request) {
-    const session = await auth(); 
+    const user = await currentUser(); 
 
-    if (!session || !session.user?.id || !session.user.email) {
+    if (!user || !user.id || !user.email) {
         return NextResponse.json({ error: "Unauthorized or missing session data" }, { status: 401 });
     }
 
-    const userId = session.user.id;
+    const userId = user.id;
     
     const body = await request.json();
     const { 
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     }
 
     try {
-        const [updatedUser, newOrg] = await prisma.$transaction(async (tx) => {
+        const [newOrg] = await prisma.$transaction(async (tx) => {
             
             const updatedUser = await tx.user.update({
                 where: { id: userId },

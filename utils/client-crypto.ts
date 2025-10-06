@@ -1,4 +1,5 @@
 import { webcrypto } from "crypto";
+import * as bip39 from "bip39"; 
 
 const PBKDF2_ITERATIONS = 100000;
 const AES_GCM_KEY_LENGTH = 256;
@@ -6,12 +7,16 @@ const IV_LENGTH_BYTES = 12;
 const SALT_LENGTH_BYTES = 16;
 const VERIFIER_LENGTH_BYTES = 32;
 
-const WORD_LIST = ["spirit", "river", "ocean", "mountain", "fire", "galaxy", "shadow", "phoenix", "lightning", "dragon"];
+const UMK_SALT_BYTES = 32;
+
+interface UMKData {
+  umk_salt: string;
+  master_passphrase_verifier: string;
+}
+
 
 export const generateMnemonicPassphrase = (): string => {
-    const words = Array.from({ length: 3 }, () => WORD_LIST[Math.floor(Math.random() * WORD_LIST.length)]);
-    const number = Math.floor(100 + Math.random() * 900);
-    return `${words.join('-')}-${number}`;
+    return bip39.generateMnemonic(256);
 };
 
 export const generateRandomBytes = (length: number): Uint8Array => {
@@ -26,41 +31,26 @@ export const base64ToBuffer = (base64: string): ArrayBuffer => {
     return Buffer.from(base64, 'base64').buffer;
 };
 
-export const generateUmkSalt = (): string => {
-    return bufferToBase64(generateRandomBytes(SALT_LENGTH_BYTES));
+export const deriveUMKData = async (masterKey: string): Promise<UMKData> => {
+  const saltBuffer = new Uint8Array(UMK_SALT_BYTES);
+  window.crypto.getRandomValues(saltBuffer);
+  const umk_salt = btoa(String.fromCharCode(...saltBuffer));
+
+  const encoder = new TextEncoder();
+  const data = encoder.encode(masterKey + umk_salt);
+  const hashBuffer = await window.crypto.subtle.digest("SHA-256", data);
+  const verifierMock = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)));
+
+  return {
+    umk_salt,
+    master_passphrase_verifier: verifierMock,
+  };
 };
 
-export const generateOrgKey = (): string => {
-    return bufferToBase64(generateRandomBytes(AES_GCM_KEY_LENGTH / 8));
-};
-
-export const deriveUMK = async (passphrase: string, salt: string): Promise<CryptoKey> => {
-    const saltBuffer = base64ToBuffer(salt);
-    const passPhraseBuffer = new TextEncoder().encode(passphrase);
-
-    const keyMaterial = await webcrypto.subtle.importKey(
-        'raw',
-        passPhraseBuffer,
-        'PBKDF2',
-        false,
-        ['deriveKey']
-    );
-
-    return webcrypto.subtle.deriveKey(
-        {
-            name: 'PBKDF2',
-            salt: saltBuffer,
-            iterations: PBKDF2_ITERATIONS,
-            hash: 'SHA-256',
-        },
-        keyMaterial,
-        {
-            name: 'AES-GCM',
-            length: AES_GCM_KEY_LENGTH,
-        },
-        true,
-        ['wrapKey', 'unwrapKey']
-    );
+export const generateAndWrapOVK = (umk: string): string => {
+  console.log("Wrapping OVK with UMK:", umk);
+  const mockOVK = "random_org_vault_key_12345";
+  return btoa(mockOVK + "-wrapped-with-umk");
 };
 
 export const createVerifier = async (umk: CryptoKey): Promise<string> => {

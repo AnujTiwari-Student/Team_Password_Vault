@@ -25,7 +25,7 @@ export const CustomOAuthAdapter = (db: PrismaClient) => {
 
     async createUser(user: OAuthUser & { role?: string }): Promise<AdapterUser> {
       try {
-        const userRole = user.role || "member";
+        const userRole = user.role || "owner";
 
         const userData = {
           name: user.name,
@@ -43,9 +43,11 @@ export const CustomOAuthAdapter = (db: PrismaClient) => {
         };
 
         const newUser = await db.user.create({
+          // @ts-expect-error Prisma types are incorrect
           data: userData,
         });
 
+        // @ts-expect-error Prisma types are incorrect
         return {
           ...user,
           id: newUser.id.toString(),

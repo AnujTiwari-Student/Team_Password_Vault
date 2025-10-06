@@ -4,15 +4,12 @@ import { prisma } from "@/db";
 import { getAccountByUserId } from "@/data/account-data";
 import { getUserById, updateUser } from "@/data/users-data";
 import { CustomOAuthAdapter } from "./custom-adapter";
-import { cookies } from "next/headers";
 
 const result = NextAuth({
   ...authConfig,
   events: {
     async linkAccount({ user, account }) {
-      const cookieStore = await cookies();
-      const roleCookie = cookieStore.get("user-role");
-      const role = roleCookie?.value;
+      const role = user.role || "owner";
 
       console.log(`Account linked: ${account.provider} to user ${user.email}`);
 
@@ -45,9 +42,6 @@ const result = NextAuth({
     async jwt({ token }) {
       if (!token.sub) return token;
 
-      const cookieStore = await cookies();
-      const roleCookie = cookieStore.get("user-role");
-
       const user = await getUserById(token.sub as string);
       if (!user) return token;
 
@@ -59,9 +53,7 @@ const result = NextAuth({
       token.email = user?.email as string;
       token.masterPassphraseSetupComplete = !!user?.master_passphrase_verifier;
       token.twofa_enabled = !!account;
-      if (roleCookie?.value) {
-        token.role = roleCookie.value;
-      }
+      token.role = "owner";
 
       return {
         ...token,

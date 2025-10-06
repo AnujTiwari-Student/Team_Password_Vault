@@ -4,7 +4,6 @@ import { getUserByEmail } from "@/data/users-data";
 import { signIn } from "@/lib/auth";
 import { verifyAuthPassword } from "@/lib/password-hash";
 import { LoginSchema } from "@/schema/zod-schema";
-import { withDB } from "@/utils/db-action";
 import * as z from "zod";
 
 type LoginActionState = {

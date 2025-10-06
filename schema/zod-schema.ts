@@ -29,3 +29,36 @@ export const RegisterSchema = z.object({
   message: "Passwords do not match",
 })
 
+export const OrgCreationSchema = z.object({
+    orgName: z
+        .string()
+        .min(1, { message: "Organization name is required" })
+        .min(3, { message: "Organization name must be at least 3 characters" })
+        .max(50, { message: "Organization name must be less than 50 characters" })
+        .regex(
+            /^[a-zA-Z0-9\s\-_&.]+$/,
+            { message: "Organization name can only contain letters, numbers, spaces, and -_&." }
+        )
+        .transform((val) => val.trim()) // Remove leading/trailing whitespace
+        .refine(
+            (val) => val.length > 0,
+            { message: "Organization name cannot be only whitespace" }
+        )
+        .refine(
+            (val) => !val.match(/\s{2,}/),
+            { message: "Organization name cannot contain multiple consecutive spaces" }
+        ),
+});
+
+export type OrgCreationType = z.infer<typeof OrgCreationSchema>;
+
+export const CompleteOrgCreationSchema = z.object({
+    orgName: OrgCreationSchema.shape.orgName,
+    masterKeyHash: z.string().min(1, "Master key hash is required"),
+    encryptedMasterKey: z.string().min(1, "Encrypted master key is required"),
+    userId: z.string().uuid("Invalid user ID format"),
+});
+
+export type CompleteOrgCreationType = z.infer<typeof CompleteOrgCreationSchema>;
+
+
