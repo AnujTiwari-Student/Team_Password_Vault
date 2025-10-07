@@ -164,12 +164,12 @@ model Membership {
 
 model Vault {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  org_id     String   @db.ObjectId
+  org_id     String?   @db.ObjectId
   name       String
   type       String   @default("org")
-  ovk_id     String   @db.ObjectId
+  ovk_id     String?   @db.ObjectId
   created_at DateTime @default(now())
-  org        Org      @relation(fields: [org_id], references: [id])
+  org        Org?      @relation(fields: [org_id], references: [id])
   items      Item[]
   shares     Share[]
   @@map("vaults")
@@ -226,6 +226,13 @@ model Audit {
   org           Org              @relation(fields: [org_id], references: [id])
   actor         User             @relation("AuditActor", fields: [actor_user_id], references: [id])
   @@map("audits")
+}
+
+model logs {
+  id            String @id @default(auto()) @map("_id")  @db.ObjectId
+  event         String
+  created_at    DateTime  @default(now())     
+  metadata          Json
 }
 
 model Invite {
