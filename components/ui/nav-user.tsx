@@ -42,7 +42,8 @@ export function NavUser({
   const { isMobile } = useSidebar()
 
   return (
-    <SidebarMenu>
+    // ✨ ADD bg-gray-900 AND text-white CLASSES HERE ✨
+    <SidebarMenu className="bg-gray-900 text-white">
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

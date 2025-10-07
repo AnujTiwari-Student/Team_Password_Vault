@@ -3,8 +3,6 @@
 import * as React from "react"
 import {
   AudioWaveform,
-  BookOpen,
-  Bot,
   Command,
   Frame,
   GalleryVerticalEnd,
@@ -26,7 +24,6 @@ import {
 import { TeamSwitcher } from "./team-switcher"
 import { NavProjects } from "./nav-projects"
 
-// This is sample data.
 const data = {
   user: {
     name: "shadcn",
@@ -35,7 +32,7 @@ const data = {
   },
   teams: [
     {
-      name: "Acme Inc",
+      name: "Secure Vault",
       logo: GalleryVerticalEnd,
       plan: "Enterprise",
     },
@@ -52,65 +49,27 @@ const data = {
   ],
   navMain: [
     {
-      title: "Playground",
+      title: "Workground",
       url: "#",
       icon: SquareTerminal,
       isActive: true,
       items: [
         {
-          title: "History",
+          title: "Dashboard",
           url: "#",
         },
         {
-          title: "Starred",
+          title: "Vaults",
           url: "#",
         },
         {
-          title: "Settings",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Models",
-      url: "#",
-      icon: Bot,
-      items: [
-        {
-          title: "Genesis",
+          title: "Audits",
           url: "#",
         },
         {
-          title: "Explorer",
-          url: "#",
-        },
-        {
-          title: "Quantum",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Documentation",
-      url: "#",
-      icon: BookOpen,
-      items: [
-        {
-          title: "Introduction",
-          url: "#",
-        },
-        {
-          title: "Get Started",
-          url: "#",
-        },
-        {
-          title: "Tutorials",
-          url: "#",
-        },
-        {
-          title: "Changelog",
-          url: "#",
-        },
+          title: "Security",
+          url: "#"
+        }
       ],
     },
     {
@@ -156,17 +115,22 @@ const data = {
   ],
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+}
+
+export function AppSidebar({ activeTab, setActiveTab, ...props }: AppSidebarProps) {
   return (
-    <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
+    <Sidebar variant="sidebar" collapsible="icon" {...props}>
+      <SidebarHeader className="bg-gray-900">
         <TeamSwitcher teams={data.teams} />
       </SidebarHeader>
-      <SidebarContent>
-        <NavMain items={data.navMain} />
+      <SidebarContent className="bg-gray-900">
+        <NavMain items={data.navMain} activeTab={activeTab} setActiveTab={setActiveTab} />
         <NavProjects projects={data.projects} />
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="bg-gray-900">
         <NavUser user={data.user} />
       </SidebarFooter>
       <SidebarRail />

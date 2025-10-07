@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+// @ts-expect-error Server Component
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { SessionProvider } from "next-auth/react";
 import { auth } from "@/lib/auth";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/ui/app-sidebar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,10 +36,8 @@ export default async function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
-          <SidebarProvider>
-            <AppSidebar />
+          <SidebarProvider className="bg-gray-900">
             <main className="w-max flex-1">
-              <SidebarTrigger />
               {children}
             </main>
             <Toaster />

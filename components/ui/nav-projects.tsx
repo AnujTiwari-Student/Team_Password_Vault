@@ -37,8 +37,8 @@ export function NavProjects({
   const { isMobile } = useSidebar()
 
   return (
-    <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Projects</SidebarGroupLabel>
+    <SidebarGroup className="group-data-[collapsible=icon]:hidden bg-gray-900 text-white">
+      <SidebarGroupLabel className="text-white font-bold">Projects</SidebarGroupLabel>
       <SidebarMenu>
         {projects.map((item) => (
           <SidebarMenuItem key={item.name}>
@@ -78,6 +78,7 @@ export function NavProjects({
           </SidebarMenuItem>
         ))}
         <SidebarMenuItem>
+          {/* Note: The existing text-sidebar-foreground/70 classes might override text-white or need adjustment for contrast. */}
           <SidebarMenuButton className="text-sidebar-foreground/70">
             <MoreHorizontal className="text-sidebar-foreground/70" />
             <span>More</span>

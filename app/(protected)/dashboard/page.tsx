@@ -1,11 +1,9 @@
 "use client";
 
-import React, { useState, useTransition } from 'react';
+import React, { useState } from 'react';
 import { redirect } from 'next/navigation';
-import { logout } from '@/actions/logout';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
-import { TopNav } from '@/components/layout/TopNav';
 import { DashboardOverview } from '@/components/dashboard/DashboardOverview';
 import { VaultsList } from '@/components/vaults/VaultsList';
 import { VaultItemTable } from '@/components/vaults/VaultItemTable';
@@ -13,7 +11,8 @@ import { AuditLogsTable } from '@/components/audit/AuditLogsTable';
 import { SecurityCenter } from '@/components/security/SecurityCenter';
 import { ItemDrawer } from '@/components/modals/ItemDrawer';
 import { ShareDialog } from '@/components/modals/ShareDialog';
-// import { Sidebar } from '@/components/layout/Sidebar';
+import { AppSidebar } from '@/components/ui/app-sidebar'; // Assuming AppSidebar is in the same directory or correctly imported
+import { SidebarTrigger } from '@/components/ui/sidebar';
 
 interface Item {
   id: number;
@@ -47,9 +46,6 @@ interface RecentActivity {
   user: string;
 }
 
-
-// Mock Data (as defined in the original component)
-const orgs = ['Personal Vault', 'Work Team', 'Family Shared'];
   
 const vaults: Vault[] = [
   { id: 1, name: 'Personal', items: 24, shared: false },
@@ -74,30 +70,17 @@ const auditLogs: AuditLog[] = [
   { id: 1, actor: 'john.doe@email.com', action: 'Password Viewed', item: 'GitHub', date: '2025-10-06 14:32' },
   { id: 2, actor: 'sarah.chen@email.com', action: 'Item Shared', item: 'AWS Console', date: '2025-10-06 09:15' },
   { id: 3, actor: 'john.doe@email.com', action: 'Item Created', item: 'Stripe Dashboard', date: '2025-10-05 16:45' },
-  { id: 4, actor: 'admin@company.com', action: 'Vault Created', item: 'Banking', date: '2025-10-04 11:20' }
+  { id: 4, actor: 'admin@company.com', action: 'Vault Created', item: 'Banking', date: '2025-04-04 11:20' }
 ];
 
 const DashboardPage = () => {
-  const [isPending, startTransition] = useTransition();
   const user = useCurrentUser();
 
-  const handleLogout = async () => {
-    try {
-      startTransition(async () => {
-        await logout();
-      });
-    } catch (error) {
-      console.error("Error during logout:", error);
-      redirect('/dashboard');
-    }
-  };
-
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('Dashboard');
   const [selectedVault, setSelectedVault] = useState<Vault | null>(null);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [revealedPasswords, setRevealedPasswords] = useState<{ [key: number]: boolean }>({});
-  const [currentOrg, setCurrentOrg] = useState('Personal Vault');
 
   const togglePasswordReveal = (itemId: number) => {
     setRevealedPasswords(prev => ({
@@ -123,58 +106,51 @@ const DashboardPage = () => {
     return null;
   }
 
-
   const renderMainContent = () => {
     switch (activeTab) {
-      case 'dashboard':
+      case 'Dashboard':
         return <DashboardOverview recentActivity={recentActivity} />;
-      case 'vaults':
-        return (
-          <>
-            <VaultsList vaults={vaults} setSelectedVault={setSelectedVault} />
-            {selectedVault && (
-              <VaultItemTable
-                selectedVault={selectedVault}
-                items={items}
-                setSelectedItem={setSelectedItem}
-                setShareDialogOpen={setShareDialogOpen}
-              />
-            )}
-          </>
-        );
-      case 'audit':
+      case 'Vaults':
+        if (selectedVault) setSelectedVault(null);
+        return <VaultsList vaults={vaults} setSelectedVault={setSelectedVault} />;
+      case 'Audits':
         return <AuditLogsTable auditLogs={auditLogs} />;
-      case 'security':
+      case 'Security':
         return <SecurityCenter />;
+      case 'General':
+      case 'Team':
+      case 'Billing':
+      case 'Limits':
+        return (
+          <div className="p-4">
+            <h2 className="text-3xl font-bold mb-6">{activeTab} Settings</h2>
+            <p>Content for the {activeTab} settings page.</p>
+          </div>
+        );
       default:
         return <DashboardOverview recentActivity={recentActivity} />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      {/* Top Navigation */}
-      {/* <TopNav
-      // @ts-expect-error Server Component
-        user={user}
-        orgs={orgs}
-        currentOrg={currentOrg}
-        setCurrentOrg={setCurrentOrg}
-        handleLogout={handleLogout}
-        isPending={isPending}
-      /> */}
+    <div className="min-h-screen bg-gray-900 text-white flex">
+      <AppSidebar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+      />
+      <SidebarTrigger className='relative' />
+      <main className="flex-1 px-2 py-8 -ml-6 mr-1 md:px-8 md:py-8 md:mr-2 w-max">
+        {renderMainContent()}
+        {selectedVault && (
+              <VaultItemTable
+                selectedVault={selectedVault}
+                items={items.filter(i => i.vault === selectedVault.id)}
+                setSelectedItem={setSelectedItem}
+                setShareDialogOpen={setShareDialogOpen}
+              />
+            )}
+      </main>
 
-      <div className="flex">
-        {/* Sidebar */}
-        {/* <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} /> */}
-
-        {/* Main Content */}
-        <main className="flex-1 p-8">
-          {renderMainContent()}
-        </main>
-      </div>
-
-      {/* Modals and Drawers (Global Overlays) */}
       <ItemDrawer
         selectedItem={selectedItem}
         setSelectedItem={setSelectedItem}

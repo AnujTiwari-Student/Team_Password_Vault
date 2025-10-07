@@ -36,7 +36,8 @@ export function TeamSwitcher({
   }
 
   return (
-    <SidebarMenu>
+    // ✨ ADD bg-gray-900 AND text-white CLASSES HERE ✨
+    <SidebarMenu className="bg-gray-700 rounded-lg text-white">
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
