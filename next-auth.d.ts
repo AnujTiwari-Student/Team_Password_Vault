@@ -4,7 +4,7 @@ declare module "next-auth" {
   interface Session {
     user: {
       email: string;
-      _id?: string;
+      id?: string;
       masterPassphraseSetupComplete?: boolean;
       master_passphrase_verifier?: string | null;
       umk_salt?: string;
@@ -14,14 +14,24 @@ declare module "next-auth" {
       created_at?: Date;
       last_login?: Date | null;
       auth_hash?: string;
-      role?: string;
+      org?: {
+        id: string;
+        name: string;
+      };
+      account_type?: "org" | "personal";
+      vault: {
+        id: string;
+        name: string;
+        ovk_id: string;
+        type: "org" | "personal";
+      }
     } & DefaultSession["user"];
   }
 
   interface JWT {
     user: {
       email: string;
-      _id?: string;
+      id?: string;
       masterPassphraseSetupComplete?: boolean;
       master_passphrase_verifier?: string | null;
       umk_salt?: string;
@@ -31,7 +41,6 @@ declare module "next-auth" {
       created_at?: Date;
       last_login?: Date | null;
       auth_hash?: string;
-      role?: string;
     } & DefaultSession["user"];
   }
 
@@ -47,6 +56,5 @@ declare module "next-auth" {
     last_login?: Date | null;
     auth_hash?: string;
     email?: string;
-    role?: string;
   }
 }

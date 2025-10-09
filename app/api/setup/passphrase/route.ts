@@ -3,95 +3,158 @@ import { prisma } from "@/db";
 import { currentUser } from "@/lib/current-user";
 
 export async function POST(request: Request) {
-    const user = await currentUser(); 
+  const user = await currentUser();
 
-    if (!user || !user.id || !user.email) {
-        return NextResponse.json({ error: "Unauthorized or missing session data" }, { status: 401 });
-    }
+  if (!user || !user.id || !user.email) {
+    return NextResponse.json(
+      { error: "Unauthorized or missing session data" },
+      { status: 401 }
+    );
+  }
 
-    const userId = user.id;
-    
-    const body = await request.json();
-    const { 
-        umk_salt, 
-        master_passphrase_verifier, 
-        ovk_wrapped_for_user, 
-        org_name 
-    } = body;
+  const userId = user.id;
 
-    if (!umk_salt || !master_passphrase_verifier || !ovk_wrapped_for_user || !org_name) {
-        console.warn("Received incomplete key material for setup:", Object.keys(body));
-        return NextResponse.json({ 
-            error: "Missing required client-side generated key materials or Organization Name." 
-        }, { status: 400 });
-    }
+  const body = await request.json();
+  const {
+    umk_salt,
+    master_passphrase_verifier,
+    ovk_wrapped_for_user,
+    org_name,
+    account_type,
+  } = body;
 
-    try {
-        const [newOrg] = await prisma.$transaction(async (tx) => {
-            
-            const updatedUser = await tx.user.update({
-                where: { id: userId },
-                data: {
-                    umk_salt: umk_salt,
-                    master_passphrase_verifier: master_passphrase_verifier,
-                },
-                select: { id: true, email: true, name: true } 
-            });
+  if (
+    !umk_salt ||
+    !master_passphrase_verifier ||
+    !ovk_wrapped_for_user ||
+    !account_type
+  ) {
+    console.warn(
+      "Received incomplete key material for setup:",
+      Object.keys(body)
+    );
+    return NextResponse.json(
+      {
+        error:
+          "Missing required client-side generated key materials or Organization Name.",
+      },
+      { status: 400 }
+    );
+  }
 
-            const newOrg = await tx.org.create({
-                data: {
-                    name: org_name,
-                    owner_user_id: userId,
-                },
-            });
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      let newOrg;
 
-            await tx.membership.create({
-                data: {
-                    org_id: newOrg.id,
-                    user_id: userId,
-                    role: 'owner', 
-                    ovk_wrapped_for_user: ovk_wrapped_for_user, 
-                },
-            });
+      const updatedUser = await tx.user.update({
+        where: { id: userId },
+        data: {
+          umk_salt,
+          master_passphrase_verifier,
+          account_type,
+        },
+        select: { id: true, email: true, name: true },
+      });
 
-            await tx.vault.create({
-                data: {
-                    org_id: newOrg.id,
-                    name: `${org_name} Default Vault`,
-                    type: 'org',
-                    ovk_id: newOrg.id, 
-                }
-            });
-
-            await tx.audit.create({
-                data: {
-                    org_id: newOrg.id,
-                    actor_user_id: userId,
-                    action: 'ORG_CREATED_AND_UMK_SETUP',
-                    subject_type: 'org',
-                    subject_id: newOrg.id,
-                    ip: request.headers.get('x-forwarded-for') || 'unknown',
-                    ua: request.headers.get('user-agent') || 'unknown',
-                    meta: { 
-                        ownerEmail: updatedUser.email, 
-                        orgName: org_name 
-                    },
-                }
-            });
-
-
-            return [updatedUser, newOrg];
+      if (account_type === "org") {
+        newOrg = await tx.org.create({
+          data: {
+            name: org_name,
+            owner_user_id: userId,
+          },
         });
 
-        return NextResponse.json({ 
-            message: "Setup complete: Master Passphrase, User, Org, and Membership created.",
-            orgId: newOrg.id
-        }, { status: 200 });
+        await tx.membership.create({
+          data: {
+            org_id: newOrg.id,
+            user_id: userId,
+            role: "admin",
+            ovk_wrapped_for_user,
+          },
+        });
 
-    } catch (error) {
-        console.error("Critical setup transaction failed:", error);
-        return NextResponse.json({ 
-            error: "Server error during critical setup. Setup failed." 
-        }, { status: 500 });
-    }
+        const orgVaultKey = await tx.orgVaultKey.create({
+          data: {
+            org_id: newOrg.id,
+            ovk_cipher: ovk_wrapped_for_user,
+          },
+        });
+
+        const vault = await tx.vault.create({
+          data: {
+            org_id: newOrg.id,
+            name: `${org_name} Vault`,
+            type: "org",
+            ovk_id: orgVaultKey.id,
+          },
+        });
+
+        await tx.audit.create({
+          data: {
+            org_id: newOrg.id,
+            actor_user_id: userId,
+            action: "ORG_CREATED_AND_UMK_SETUP",
+            subject_type: "org",
+            subject_id: newOrg.id,
+            ip: request.headers.get("x-forwarded-for") || "unknown",
+            ua: request.headers.get("user-agent") || "unknown",
+            meta: {
+              ownerEmail: updatedUser.email,
+              orgName: org_name,
+              vaultName: vault.name,
+            },
+          },
+        });
+      } else if (account_type === "personal") {
+        const personalVaultKey = await tx.personalVaultKey.create({
+          data: {
+            user_id: userId,
+            ovk_cipher: ovk_wrapped_for_user,
+          },
+        });
+
+        const vault = await tx.vault.create({
+          data: {
+            name: "Personal Vault",
+            type: "personal",
+            user_id: userId,
+            ovk_id: personalVaultKey.id,
+          },
+        });
+
+        await tx.logs.create({
+          data: {
+            user_id: userId,
+            action: "PERSONAL_SETUP",
+            ip: request.headers.get("x-forwarded-for") || "unknown",
+            ua: request.headers.get("user-agent") || "unknown",
+            subject_type: "PERSONAL_VAULT_SETUP",
+            meta: {
+              ownerEmail: updatedUser.email,
+              vaultName: vault.name,
+            },
+          },
+        });
+      }
+
+      return [updatedUser, newOrg];
+    });
+
+    return NextResponse.json(
+      {
+        message:
+          "Setup complete: Master Passphrase, User, Org, and Membership created.",
+          result,
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Critical setup transaction failed:", error);
+    return NextResponse.json(
+      {
+        error: "Server error during critical setup. Setup failed.",
+      },
+      { status: 500 }
+    );
+  }
 }

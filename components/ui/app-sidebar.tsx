@@ -23,28 +23,14 @@ import {
 } from "@/components/ui/sidebar"
 import { TeamSwitcher } from "./team-switcher"
 import { NavProjects } from "./nav-projects"
+import { useCurrentUser } from "@/hooks/useCurrentUser"
 
 const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
   teams: [
     {
-      name: "Secure Vault",
+      name: "Design Engineering",
       logo: GalleryVerticalEnd,
       plan: "Enterprise",
-    },
-    {
-      name: "Acme Corp.",
-      logo: AudioWaveform,
-      plan: "Startup",
-    },
-    {
-      name: "Evil Corp.",
-      logo: Command,
-      plan: "Free",
     },
   ],
   navMain: [
@@ -59,10 +45,6 @@ const data = {
           url: "#",
         },
         {
-          title: "Vaults",
-          url: "#",
-        },
-        {
           title: "Audits",
           url: "#",
         },
@@ -73,24 +55,20 @@ const data = {
       ],
     },
     {
-      title: "Settings",
+      title: "Vault Settings",
       url: "#",
       icon: Settings2,
       items: [
         {
-          title: "General",
+          title: "Settings",
           url: "#",
         },
         {
-          title: "Team",
+          title: "Items",
           url: "#",
         },
         {
           title: "Billing",
-          url: "#",
-        },
-        {
-          title: "Limits",
           url: "#",
         },
       ],
@@ -121,8 +99,15 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 }
 
 export function AppSidebar({ activeTab, setActiveTab, ...props }: AppSidebarProps) {
+
+  const user = useCurrentUser();
+
+  if (!user) {
+    return null;
+  }
+
   return (
-    <Sidebar variant="sidebar" collapsible="icon" {...props}>
+    <Sidebar className="py-2" variant="sidebar" collapsible="icon" {...props}>
       <SidebarHeader className="bg-gray-900">
         <TeamSwitcher teams={data.teams} />
       </SidebarHeader>
@@ -131,7 +116,8 @@ export function AppSidebar({ activeTab, setActiveTab, ...props }: AppSidebarProp
         <NavProjects projects={data.projects} />
       </SidebarContent>
       <SidebarFooter className="bg-gray-900">
-        <NavUser user={data.user} />
+        {/* @ts-expect-error Todo: Type missmatch */}
+        <NavUser user={user} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

@@ -13,6 +13,11 @@ enum AuthProvider {
   sso
 }
 
+enum VaultType {
+  org
+  personal
+}
+
 enum MemberRole {
   owner
   admin
@@ -44,110 +49,60 @@ enum AuditSubjectType {
   invite
 }
 
-enum Role {
-  owner
-  admin
-  member
-  viewer
-}
-
 model User {
   id                         String       @id @default(auto()) @map("_id") @db.ObjectId
   email                      String       @unique
   name                       String?
   image                      String?
-  email_verified              DateTime?
-  auth_hash                  String?      @db.String
+  email_verified             DateTime?
+  auth_hash                  String?
   auth_provider              AuthProvider @default(oauth)
-  umk_salt                   String?      @db.String
-  master_passphrase_verifier String?      @db.String
+  umk_salt                   String?
+  master_passphrase_verifier String?
   twofa_enabled              Boolean      @default(false)
   public_key                 String?
   created_at                 DateTime     @default(now())
   last_login                 DateTime?
-
-  accounts    Account[]
-  orgs        Org[]        @relation("OrgOwner")
-  memberships Membership[]
-  items       Item[]       @relation("ItemCreator")
-  shares      Share[]      @relation("ShareGranteeUser")
-  audits      Audit[]      @relation("AuditActor")
-  invitesSent Invite[]     @relation("InvitedBy")
-
-  role              Role?         
-  ownerProfile      OwnerProfile?
-  adminProfile      AdminProfile?
-  memberProfile     MemberProfile?
-  viewerProfile     ViewerProfile?
-
-  @@map("users")
-}
-
-model OwnerProfile {
-  id              String @id @default(auto()) @map("_id") @db.ObjectId
-  userId          String @unique @db.ObjectId
-  onboardingNotes String?
-  orgPreferences  Json?
-  user            User   @relation(fields: [userId], references: [id])
-  @@map("owner_profiles")
-}
-
-model AdminProfile {
-  id              String @id @default(auto()) @map("_id") @db.ObjectId
-  userId          String @unique @db.ObjectId
-  dashboardPrefs  Json?
-  adminNotes      String?
-  user            User   @relation(fields: [userId], references: [id])
-  @@map("admin_profiles")
-}
-
-model MemberProfile {
-  id              String @id @default(auto()) @map("_id") @db.ObjectId
-  userId          String @unique @db.ObjectId
-  preferences     Json?
-  displayOptions  Json?
-  user            User   @relation(fields: [userId], references: [id])
-  @@map("member_profiles")
-}
-
-model ViewerProfile {
-  id               String @id @default(auto()) @map("_id") @db.ObjectId
-  userId           String @unique @db.ObjectId
-  consentFlags     Json?
-  lastOnboardingAt DateTime?
-  user             User   @relation(fields: [userId], references: [id])
-  @@map("viewer_profiles")
+  account_type               String
+  accounts                   Account[]
+  vaults                     Vault[]
+  orgs                       Org[]        @relation("OrgOwner")
+  memberships                Membership[]
+  items                      Item[]       @relation("ItemCreator")
+  shares                     Share[]      @relation("ShareGranteeUser")
+  audits                     Audit[]      @relation("AuditActor")
+  invitesSent                Invite[]     @relation("InvitedBy")
+  logs                       Logs[]
 }
 
 model Account {
-  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId             String   @map("user_id") @db.ObjectId
-  type               String
-  provider           String
-  providerAccountId  String   @map("provider_account_id")
-  refresh_token      String?
-  access_token       String?
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?
-  session_state      String?
-  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @map("user_id") @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([provider, providerAccountId])
-  @@map("accounts")
 }
 
 model Org {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  id            String       @id @default(auto()) @map("_id") @db.ObjectId
   name          String
-  owner_user_id String   @db.ObjectId
-  created_at    DateTime @default(now())
-  owner         User     @relation("OrgOwner", fields: [owner_user_id], references: [id])
+  owner_user_id String       @db.ObjectId
+  created_at    DateTime     @default(now())
+  owner         User         @relation("OrgOwner", fields: [owner_user_id], references: [id])
   memberships   Membership[]
   vaults        Vault[]
   invites       Invite[]
   audits        Audit[]
-  @@map("orgs")
 }
 
 model Membership {
@@ -157,22 +112,31 @@ model Membership {
   role                 MemberRole @default(member)
   ovk_wrapped_for_user String
   created_at           DateTime   @default(now())
-  org                  Org       @relation(fields: [org_id], references: [id])
-  user                 User      @relation(fields: [user_id], references: [id])
-  @@map("memberships")
+  org                  Org        @relation(fields: [org_id], references: [id])
+  user                 User       @relation(fields: [user_id], references: [id])
+
+  @@index([org_id, user_id])
 }
 
 model Vault {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  org_id     String?   @db.ObjectId
-  name       String
-  type       String   @default("org")
-  ovk_id     String?   @db.ObjectId
-  created_at DateTime @default(now())
-  org        Org?      @relation(fields: [org_id], references: [id])
-  items      Item[]
-  shares     Share[]
-  @@map("vaults")
+  id                 String            @id @default(auto()) @map("_id") @db.ObjectId
+  org_id             String?           @db.ObjectId
+  user_id            String?           @db.ObjectId
+  name               String
+  type               VaultType
+  ovk_id             String            @db.ObjectId
+  created_at         DateTime          @default(now())
+  org                Org?              @relation(fields: [org_id], references: [id])
+  user               User?             @relation(fields: [user_id], references: [id])
+  items              Item[]
+  shares             Share[]
+  OrgVaultKey        OrgVaultKey?      @relation(fields: [orgVaultKeyId], references: [id])
+  orgVaultKeyId      String?           @db.ObjectId
+  PersonalVaultKey   PersonalVaultKey? @relation(fields: [personalVaultKeyId], references: [id])
+  personalVaultKeyId String?           @db.ObjectId
+
+  @@unique([org_id, name])
+  @@unique([user_id, name])
 }
 
 model Item {
@@ -191,7 +155,6 @@ model Item {
   updated_at       DateTime @default(now())
   vault            Vault    @relation(fields: [vault_id], references: [id])
   creator          User     @relation("ItemCreator", fields: [created_by], references: [id])
-  @@map("items")
 }
 
 model Share {
@@ -200,7 +163,7 @@ model Share {
   target_id    String           @db.ObjectId
   grantee_type ShareGranteeType
   grantee_id   String?          @db.ObjectId
-  role         String?
+  grantee_role String?
   created_at   DateTime         @default(now())
   view         Boolean          @default(false)
   edit         Boolean          @default(false)
@@ -209,7 +172,6 @@ model Share {
   granteeUser  User?            @relation("ShareGranteeUser", fields: [grantee_id], references: [id])
   Vault        Vault?           @relation(fields: [vaultId], references: [id])
   vaultId      String?          @db.ObjectId
-  @@map("shares")
 }
 
 model Audit {
@@ -225,14 +187,18 @@ model Audit {
   meta          Json
   org           Org              @relation(fields: [org_id], references: [id])
   actor         User             @relation("AuditActor", fields: [actor_user_id], references: [id])
-  @@map("audits")
 }
 
-model logs {
-  id            String @id @default(auto()) @map("_id")  @db.ObjectId
-  event         String
-  created_at    DateTime  @default(now())     
-  metadata          Json
+model Logs {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  user_id      String   @db.ObjectId
+  action       String
+  subject_type String
+  ip           String?
+  ua           String?
+  ts           DateTime @default(now())
+  meta         Json
+  user         User     @relation(fields: [user_id], references: [id])
 }
 
 model Invite {
@@ -243,7 +209,24 @@ model Invite {
   token      String     @unique
   expires_at DateTime
   invited_by String     @db.ObjectId
-  org        Org       @relation(fields: [org_id], references: [id])
-  invitedBy  User      @relation("InvitedBy", fields: [invited_by], references: [id])
-  @@map("invites")
+  org        Org        @relation(fields: [org_id], references: [id])
+  invitedBy  User       @relation("InvitedBy", fields: [invited_by], references: [id])
+
+  @@index([org_id, email])
+}
+
+model OrgVaultKey {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  org_id     String   @db.ObjectId
+  ovk_cipher String
+  created_at DateTime @default(now())
+  vaults     Vault[]
+}
+
+model PersonalVaultKey {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  user_id    String   @db.ObjectId
+  ovk_cipher String
+  created_at DateTime @default(now())
+  vaults     Vault[]
 }

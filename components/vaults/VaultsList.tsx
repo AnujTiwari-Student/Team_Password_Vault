@@ -1,5 +1,6 @@
 import React from 'react';
-import { Lock, Users, Plus } from 'lucide-react';
+import { Lock, Users } from 'lucide-react';
+import AddingItemsModal from '../modals/AddingItems';
 
 interface Vault {
   id: number;
@@ -17,11 +18,8 @@ export const VaultsList: React.FC<VaultsListProps> = ({ vaults, setSelectedVault
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">Vaults</h2>
-        <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
-          <Plus size={18} />
-          Create Vault
-        </button>
+        <h2 className="text-2xl font-bold text-white">Items</h2>
+        <AddingItemsModal />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

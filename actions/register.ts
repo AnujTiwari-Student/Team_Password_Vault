@@ -4,8 +4,8 @@ import { getUserByEmail } from "@/data/users-data";
 import { prisma } from "@/db";
 import { hashAuthPassword } from "@/lib/password-hash";
 import { RegisterSchema } from "@/schema/zod-schema";
+import { getNameFromEmail } from "@/utils/get-name";
 import * as z from "zod";
-import { cookies } from "next/headers";
 
 type RegisterActionState = {
   success: boolean;
@@ -19,6 +19,7 @@ type RegisterActionState = {
   user?: {
     id: string;
     email: string;
+    name: string | null;
   };
 };
 
@@ -66,16 +67,14 @@ export const register = async (
     };
   }
 
-  const cookieStore = await cookies();
-  const roleCookie = cookieStore.get("user-role");
-  const role = roleCookie?.value || "owner" || null;
+  const username = getNameFromEmail(email);
 
   const newUser = await prisma.user.create({
     data: {
       email,
       auth_hash: hashedPassword,
       auth_provider: "credentials",
-      name: null,
+      name: username,
       image: null,
       umk_salt: null,
       master_passphrase_verifier: null,
@@ -83,8 +82,7 @@ export const register = async (
       email_verified: null,
       public_key: null,
       last_login: null,
-      // @ts-expect-error Prisma types are incorrect
-      role,
+      account_type: "personal",
     },
   });
 
@@ -94,6 +92,7 @@ export const register = async (
     user: {
       id: newUser.id!.toString(),
       email: newUser.email,
+      name: newUser.name,
     },
   };
 };

@@ -1,20 +1,9 @@
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, User, AuthProvider } from "@prisma/client";
 import { AdapterUser } from "@auth/core/adapters";
 
-type OAuthUser = {
-    id?: string;
-    name: string | null;
-    email: string;
-    email_verified?: Date | null;
-    image?: string | null;
-    auth_provider?: string;
-    auth_hash?: string | null;
-    umk_salt?: string | null;
-    master_passphrase_verifier?: string | null;
-    twofa_enabled?: boolean;
-    public_key?: string | null;
-    last_login?: Date | null;
+interface ExtendedAdapterUser extends AdapterUser {
+  account_type?: string;
 }
 
 export const CustomOAuthAdapter = (db: PrismaClient) => {
@@ -23,35 +12,42 @@ export const CustomOAuthAdapter = (db: PrismaClient) => {
   return {
     ...baseAdapter,
 
-    async createUser(user: OAuthUser & { role?: string }): Promise<AdapterUser> {
+    async createUser(user: User): Promise<ExtendedAdapterUser> {
       try {
-        const userRole = user.role || "owner";
-
-        const userData = {
-          name: user.name,
+        const data = {
+          name: user.name ?? undefined,
           email: user.email,
-          email_verified: user.email_verified || null,
-          image: user.image || null,
-          auth_provider: "oauth",
-          auth_hash: null,
-          umk_salt: user.umk_salt || null,
-          master_passphrase_verifier: user.master_passphrase_verifier || null,
+          email_verified: user.email_verified ?? undefined,
+          image: user.image ?? undefined,
+          auth_provider: AuthProvider.oauth,
+          umk_salt: user.umk_salt ?? undefined,
+          master_passphrase_verifier: user.master_passphrase_verifier ?? undefined,
           twofa_enabled: true,
-          public_key: user.public_key || null,
-          last_login: user.last_login || null,
-          role: userRole,
+          public_key: user.public_key ?? undefined,
+          last_login: user.last_login ?? undefined,
+          auth_hash: undefined,
+          account_type: "personal",
         };
 
-        const newUser = await db.user.create({
-          // @ts-expect-error Prisma types are incorrect
-          data: userData,
-        });
+        const newUser = await db.user.create({ data });
 
-        // @ts-expect-error Prisma types are incorrect
         return {
-          ...user,
-          id: newUser.id.toString(),
-        };
+          _id: newUser.id,
+          id: newUser.id,
+          email: newUser.email,
+          name: newUser.name,
+          image: newUser.image,
+          emailVerified: newUser.email_verified ?? null,
+          auth_hash: newUser.auth_hash ?? null,
+          auth_provider: newUser.auth_provider,
+          umk_salt: newUser.umk_salt ?? null,
+          master_passphrase_verifier: newUser.master_passphrase_verifier ?? null,
+          twofa_enabled: newUser.twofa_enabled,
+          public_key: newUser.public_key ?? null,
+          last_login: newUser.last_login ?? null,
+          masterPassphraseSetupComplete: !!newUser.master_passphrase_verifier,
+          account_type: newUser.account_type,
+        } as ExtendedAdapterUser;
       } catch (error) {
         console.error(`Error creating user via OAuth for ${user.email}:`, error);
         throw error;

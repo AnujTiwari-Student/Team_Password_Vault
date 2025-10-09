@@ -75,6 +75,7 @@ function RegisterForm() {
                                         <Input
                                             {...field}
                                             type="email"
+                                            className="text-white"
                                         />
                                     </FormControl>
                                     <FormMessage />

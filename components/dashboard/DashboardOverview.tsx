@@ -1,5 +1,6 @@
 import React from 'react';
 import { Lock, Users, Shield, Clock, Plus } from 'lucide-react';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 interface RecentActivity {
   action: string;
@@ -13,6 +14,17 @@ interface DashboardOverviewProps {
 }
 
 export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ recentActivity }) => {
+
+  const user = useCurrentUser();
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+        <div className="text-xl">Loading User Data...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -32,10 +44,17 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({ recentActi
           <p className="text-3xl font-bold text-white">62</p>
         </div>
         <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-          <div className="flex items-center gap-3 mb-2">
-            <Users className="text-green-400" size={24} />
-            <h3 className="text-gray-400 text-sm">Shared Vaults</h3>
-          </div>
+          {user.org ? (
+            <div className="flex items-center gap-3 mb-2">
+              <Users className="text-green-400" size={24} />
+              <h3 className="text-gray-400 text-sm">Shared Vaults</h3>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 mb-2">
+              <Users className="text-green-400" size={24} />
+              <h3 className="text-gray-400 text-sm">Teams Joined</h3>
+            </div>
+          )}
           <p className="text-3xl font-bold text-white">3</p>
         </div>
         <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">

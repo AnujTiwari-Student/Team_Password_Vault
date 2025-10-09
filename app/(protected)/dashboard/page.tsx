@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { redirect } from 'next/navigation';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
@@ -11,8 +11,9 @@ import { AuditLogsTable } from '@/components/audit/AuditLogsTable';
 import { SecurityCenter } from '@/components/security/SecurityCenter';
 import { ItemDrawer } from '@/components/modals/ItemDrawer';
 import { ShareDialog } from '@/components/modals/ShareDialog';
-import { AppSidebar } from '@/components/ui/app-sidebar'; // Assuming AppSidebar is in the same directory or correctly imported
+import { AppSidebar } from '@/components/ui/app-sidebar'; 
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import VaultSetting from '@/components/vaults/VaultSetting'
 
 interface Item {
   id: number;
@@ -46,7 +47,7 @@ interface RecentActivity {
   user: string;
 }
 
-  
+
 const vaults: Vault[] = [
   { id: 1, name: 'Personal', items: 24, shared: false },
   { id: 2, name: 'Work Accounts', items: 18, shared: true },
@@ -93,6 +94,12 @@ const DashboardPage = () => {
     navigator.clipboard.writeText(text);
   };
 
+  useEffect(() => {
+    if (user && !user.masterPassphraseSetupComplete) {
+      redirect('/setup/master-passphrase');
+    }
+  }, [user]);
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
@@ -101,29 +108,23 @@ const DashboardPage = () => {
     );
   }
 
-  if (user && !user.masterPassphraseSetupComplete) {
-    redirect('/setup/master-passphrase');
-    return null;
-  }
-
   const renderMainContent = () => {
     switch (activeTab) {
       case 'Dashboard':
         return <DashboardOverview recentActivity={recentActivity} />;
-      case 'Vaults':
+      case 'Items':
         if (selectedVault) setSelectedVault(null);
         return <VaultsList vaults={vaults} setSelectedVault={setSelectedVault} />;
       case 'Audits':
         return <AuditLogsTable auditLogs={auditLogs} />;
       case 'Security':
         return <SecurityCenter />;
-      case 'General':
-      case 'Team':
+      case 'Settings':
+        return <VaultSetting />
       case 'Billing':
-      case 'Limits':
         return (
           <div className="p-4">
-            <h2 className="text-3xl font-bold mb-6">{activeTab} Settings</h2>
+            <h2 className="text-3xl font-bold mb-6">{activeTab}</h2>
             <p>Content for the {activeTab} settings page.</p>
           </div>
         );
@@ -134,21 +135,21 @@ const DashboardPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex">
-      <AppSidebar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
+      <AppSidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
       />
       <SidebarTrigger className='relative' />
       <main className="flex-1 px-2 py-8 -ml-6 mr-1 md:px-8 md:py-8 md:mr-2 w-max">
         {renderMainContent()}
         {selectedVault && (
-              <VaultItemTable
-                selectedVault={selectedVault}
-                items={items.filter(i => i.vault === selectedVault.id)}
-                setSelectedItem={setSelectedItem}
-                setShareDialogOpen={setShareDialogOpen}
-              />
-            )}
+          <VaultItemTable
+            selectedVault={selectedVault}
+            items={items.filter(i => i.vault === selectedVault.id)}
+            setSelectedItem={setSelectedItem}
+            setShareDialogOpen={setShareDialogOpen}
+          />
+        )}
       </main>
 
       <ItemDrawer
@@ -158,7 +159,7 @@ const DashboardPage = () => {
         togglePasswordReveal={togglePasswordReveal}
         copyToClipboard={copyToClipboard}
       />
-      
+
       <ShareDialog
         shareDialogOpen={shareDialogOpen}
         setShareDialogOpen={setShareDialogOpen}

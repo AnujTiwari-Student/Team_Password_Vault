@@ -1,3 +1,4 @@
+import { ItemType } from "@prisma/client";
 import * as z from "zod";
 
 const ERR_PASSWORD_REQ = "Password doesn't meet requirements";
@@ -29,7 +30,7 @@ export const RegisterSchema = z.object({
   message: "Passwords do not match",
 })
 
-export const OrgCreationSchema = z.object({
+export const AccountTypeValidationSchema = z.object({
     orgName: z
         .string()
         .min(1, { message: "Organization name is required" })
@@ -39,7 +40,7 @@ export const OrgCreationSchema = z.object({
             /^[a-zA-Z0-9\s\-_&.]+$/,
             { message: "Organization name can only contain letters, numbers, spaces, and -_&." }
         )
-        .transform((val) => val.trim()) // Remove leading/trailing whitespace
+        .transform((val) => val.trim()) 
         .refine(
             (val) => val.length > 0,
             { message: "Organization name cannot be only whitespace" }
@@ -48,12 +49,13 @@ export const OrgCreationSchema = z.object({
             (val) => !val.match(/\s{2,}/),
             { message: "Organization name cannot contain multiple consecutive spaces" }
         ),
+    accountType: z.enum(["org", "personal"]),
 });
 
-export type OrgCreationType = z.infer<typeof OrgCreationSchema>;
+export type AccountTypeValidationType = z.infer<typeof AccountTypeValidationSchema>;
 
 export const CompleteOrgCreationSchema = z.object({
-    orgName: OrgCreationSchema.shape.orgName,
+    orgName: AccountTypeValidationSchema.shape.orgName,
     masterKeyHash: z.string().min(1, "Master key hash is required"),
     encryptedMasterKey: z.string().min(1, "Encrypted master key is required"),
     userId: z.string().uuid("Invalid user ID format"),
@@ -61,4 +63,29 @@ export const CompleteOrgCreationSchema = z.object({
 
 export type CompleteOrgCreationType = z.infer<typeof CompleteOrgCreationSchema>;
 
+export const VaultCreationSchema = z.object({
+    name: z.string().min(1, "Vault name is required"),
+    type: z.enum(["personal", "org"]),
+    orgId: z.string().optional(),
+    ovkId: z.string().optional(), 
+});
+
+export type VaultCreationType = z.infer<typeof VaultCreationSchema>;
+
+export const ItemCreationSchema = z.object({
+    mnemonic: z.string().min(1, "Mnemonic is required"),
+    item_name: z.string().min(1, "Item name is required"),
+    item_url: z.string().url("Invalid URL"),
+    username_ct: z.string(),
+    password_ct: z.string().optional(),
+    totp_seed_ct: z.string().optional(),
+    vaultId: z.string(),
+    item_key_wrapped: z.string().optional(),
+    type: z.enum(ItemType),
+    tags: z.array(z.string()).optional(),
+    notes_ct: z.string().optional(),
+    created_by: z.string()
+});
+
+export type ItemCreationType = z.infer<typeof ItemCreationSchema>;
 

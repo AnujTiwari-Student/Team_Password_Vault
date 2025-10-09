@@ -1,19 +1,22 @@
+import { getVaultByOrgId } from './../data/vault-data';
 import NextAuth, { type NextAuthResult } from "next-auth";
 import authConfig from "./auth.config";
 import { prisma } from "@/db";
 import { getAccountByUserId } from "@/data/account-data";
 import { getUserById, updateUser } from "@/data/users-data";
 import { CustomOAuthAdapter } from "./custom-adapter";
+import { getOrgById } from "@/data/org-data";
+import { Org, Vault } from "@prisma/client";
+import { getVaultByUserId } from "@/data/vault-data";
 
 const result = NextAuth({
   ...authConfig,
   events: {
     async linkAccount({ user, account }) {
-      const role = user.role || "owner";
 
       console.log(`Account linked: ${account.provider} to user ${user.email}`);
 
-      await updateUser(user.id as string, role);
+      await updateUser(user.id as string);
     },
   },
   callbacks: {
@@ -29,10 +32,9 @@ const result = NextAuth({
         session.user.twofa_enabled = token.twofa_enabled as boolean;
         session.user.masterPassphraseSetupComplete =
           !!token.masterPassphraseSetupComplete;
-      }
-
-      if (token.role) {
-        session.user.role = token.role as string;
+        session.user.org = token.org as Org;
+        session.user.account_type = token.account_type as "org" | "personal";
+        session.user.vault = token.vault as Vault;
       }
 
       console.log("Session callback - session:", session);
@@ -47,13 +49,31 @@ const result = NextAuth({
 
       const account = await getAccountByUserId(token.sub as string);
 
+      const org = await getOrgById(user.id as string);
+      if (org) {
+        token.org = org;
+      }
+
       console.log("JWT callback - token before:", token);
       console.log("JWT callback - user:", user);
 
       token.email = user?.email as string;
       token.masterPassphraseSetupComplete = !!user?.master_passphrase_verifier;
       token.twofa_enabled = !!account;
-      token.role = "owner";
+      token.name = user?.name as string;
+      token.account_type = user?.account_type;
+
+      if(token.account_type === "personal") {
+        const vault = await getVaultByUserId(user.id as string);
+        if (vault) {
+          token.vault = vault;
+        }
+      }else if (token.account_type === "org") {
+        const vault = await getVaultByOrgId(org?.id as string);
+        if (vault) {
+          token.vault = vault;
+        }
+      }
 
       return {
         ...token,

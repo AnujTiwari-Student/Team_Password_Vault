@@ -14,15 +14,13 @@ export const getUserById = async (id: string) => {
     });
 }
 
-export const updateUser = async (id: string, role?: string) => {
+export const updateUser = async (id: string) => {
   try {
     const user = await prisma.user.update({
       where: { id },
-    //   @ts-expect-error Prisma types are incorrect
       data: {
         email_verified: new Date(),
         twofa_enabled: true,
-        ...(role ? { role } : {}),  
       },
     });
     return user;
