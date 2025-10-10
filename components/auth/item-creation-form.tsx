@@ -27,11 +27,17 @@ function ItemCreationForm() {
 
     const { umkCryptoKey } = useUserMasterKey(mnemonic || null);
 
+    console.log("umkCryptoKey:", umkCryptoKey);
+
+    console.log("user org id:", user?.org?.id);
+
     const ovkCryptoKey = useVaultOVK(
         umkCryptoKey,
         user?.org?.id || user?.id || null,
         user?.vault?.type
     );
+
+    console.log("ovkCryptoKey:", ovkCryptoKey);
 
     const [isPending, startTransition] = React.useTransition();
     const [success, setSuccess] = React.useState<string | null>(null);

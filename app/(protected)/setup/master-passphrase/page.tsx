@@ -22,13 +22,14 @@ import { useClipboard } from "@/hooks/useClipboard";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import AccountTypeValidation from "@/components/ui/account-type-validation";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useUserMasterKey } from "@/hooks/useUserMasterKey";
 import { useVaultOVK } from "@/hooks/useVaultOvk";
+import { useSession } from "next-auth/react";
 
 const MasterPassphraseSetup: React.FC = () => {
   const router = useRouter();
-  const user = useCurrentUser();
+  const { data: session, update } = useSession();
+  const user = session?.user;
 
   const [mnemonic, setMnemonic] = useState<string | null>(null);
   const [salt, setSalt] = useState<string | null>(null);
@@ -38,12 +39,16 @@ const MasterPassphraseSetup: React.FC = () => {
   const [orgName, setOrgName] = useState("");
   const [status, setStatus] = useState("");
   const [showKey, setShowKey] = useState(true);
-  const [accountType, setAccountType] = useState<"org" | "personal">("org");
+  const [accountType, setAccountType] = useState("org");
 
   const { isCopied, copy } = useClipboard({ successDuration: 100000 });
 
   const { umkCryptoKey } = useUserMasterKey(mnemonic);
-  const ovkCryptoKey = useVaultOVK(umkCryptoKey, user?.vault?.ovk_id || null, user?.account_type);
+  const ovkCryptoKey = useVaultOVK(
+    umkCryptoKey,
+    user?.vault?.ovk_id || null,
+    user?.account_type
+  );
 
   const runSetup = useCallback(async () => {
     setStatus("Generating Master Key...");
@@ -76,6 +81,9 @@ const MasterPassphraseSetup: React.FC = () => {
     if (!mnemonic) {
       runSetup();
     }
+
+    return () => {
+    };
   }, [mnemonic, runSetup]);
 
   useEffect(() => {
@@ -93,41 +101,43 @@ const MasterPassphraseSetup: React.FC = () => {
     if (accountType === "org" && !orgName.trim()) return;
 
     let ovkToSend = ovkWrapped;
-    if (!ovkToSend && ovkCryptoKey && umkCryptoKey) {
-      try {
-        const exportedRaw = await window.crypto.subtle.exportKey("raw", ovkCryptoKey);
-        const rawBase64 = bufferToBase64(exportedRaw);
-        ovkToSend = await wrapKey(rawBase64, umkCryptoKey);
-      } catch (error) {
-        setStatus("Error wrapping OVK for submission.");
-        console.error(error);
+    if (!ovkToSend) {
+      if (ovkCryptoKey && umkCryptoKey) {
+        try {
+          const exportedRaw = await window.crypto.subtle.exportKey("raw", ovkCryptoKey);
+          const rawBase64 = bufferToBase64(exportedRaw);
+          ovkToSend = await wrapKey(rawBase64, umkCryptoKey);
+        } catch (error) {
+          setStatus("Error wrapping OVK for submission.");
+          console.error(error);
+          return;
+        }
+      } else {
+        setStatus("Vault key is not ready yet.");
         return;
       }
     }
 
-    if (!ovkToSend) {
-      setStatus("Vault key is not ready yet.");
-      return;
-    }
 
     const body =
       accountType === "org"
         ? {
-            umk_salt: salt,
-            master_passphrase_verifier: verifier,
-            ovk_wrapped_for_user: ovkToSend,
-            org_name: orgName || null,
-            account_type: accountType,
-          }
+          umk_salt: salt,
+          master_passphrase_verifier: verifier,
+          ovk_wrapped_for_user: ovkToSend,
+          org_name: orgName || null,
+          account_type: accountType,
+        }
         : {
-            umk_salt: salt,
-            master_passphrase_verifier: verifier,
-            ovk_wrapped_for_user: ovkToSend,
-            account_type: accountType,
-          };
+          umk_salt: salt,
+          master_passphrase_verifier: verifier,
+          ovk_wrapped_for_user: ovkToSend,
+          account_type: accountType,
+        };
 
     setIsProcessing(true);
     setStatus("Sending secrets metadata and creating organization...");
+
     try {
       const response = await fetch("/api/setup/passphrase", {
         method: "POST",
@@ -137,18 +147,25 @@ const MasterPassphraseSetup: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setStatus(`Success! Org created: ${data.orgId}. Redirecting...`);
+
+        setStatus(`Success! Org created: ${data.orgId}. Redirecting in 5 seconds...`);
         toast.success("Organization created successfully!");
+
+        setIsProcessing(false);
+
+        await update(); 
+
         router.push("/dashboard");
+
       } else {
         const errorData = await response.json();
         setStatus(`API Error: ${errorData.error || response.statusText}`);
+        setIsProcessing(false); 
       }
     } catch (error) {
       setStatus("Network or client-side error during API call.");
       console.error("API call failed:", error);
-    } finally {
-      setIsProcessing(false);
+      setIsProcessing(false); 
     }
   };
 
@@ -170,6 +187,7 @@ const MasterPassphraseSetup: React.FC = () => {
       canProceed,
     });
   }, [accountType, orgName, isCopied, isReady, isProcessing, canProceed]);
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-gray-800 flex items-center justify-center p-4 sm:p-6">
@@ -225,11 +243,10 @@ const MasterPassphraseSetup: React.FC = () => {
                 </button>
                 <button
                   onClick={handleCopy}
-                  className={`px-4 py-2 text-sm font-semibold rounded-lg flex items-center transition-all duration-200 ${
-                    isCopied
+                  className={`px-4 py-2 text-sm font-semibold rounded-lg flex items-center transition-all duration-200 ${isCopied
                       ? "bg-green-600 text-white shadow-lg"
                       : "bg-blue-600 text-white hover:bg-blue-700 shadow-lg"
-                  }`}
+                    }`}
                   disabled={!isReady || isProcessing}
                 >
                   {isCopied ? (
@@ -247,11 +264,10 @@ const MasterPassphraseSetup: React.FC = () => {
               </div>
             </div>
             <div
-              className={`font-mono text-sm break-words p-4 bg-gray-950 border border-gray-700 rounded-lg transition-all duration-200 ${
-                showKey
+              className={`font-mono text-sm break-words p-4 bg-gray-950 border border-gray-700 rounded-lg transition-all duration-200 ${showKey
                   ? "text-gray-200 select-all"
                   : "text-transparent select-none blur-sm"
-              }`}
+                }`}
             >
               {mnemonic || "Generating your secure master key..."}
             </div>

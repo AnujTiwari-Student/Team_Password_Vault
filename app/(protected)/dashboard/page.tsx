@@ -5,8 +5,7 @@ import { redirect } from 'next/navigation';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 import { DashboardOverview } from '@/components/dashboard/DashboardOverview';
-import { VaultsList } from '@/components/vaults/VaultsList';
-import { VaultItemTable } from '@/components/vaults/VaultItemTable';
+import { ItemList } from '@/components/vaults/ItemList';
 import { AuditLogsTable } from '@/components/audit/AuditLogsTable';
 import { SecurityCenter } from '@/components/security/SecurityCenter';
 import { ItemDrawer } from '@/components/modals/ItemDrawer';
@@ -78,21 +77,6 @@ const DashboardPage = () => {
   const user = useCurrentUser();
 
   const [activeTab, setActiveTab] = useState('Dashboard');
-  const [selectedVault, setSelectedVault] = useState<Vault | null>(null);
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const [shareDialogOpen, setShareDialogOpen] = useState(false);
-  const [revealedPasswords, setRevealedPasswords] = useState<{ [key: number]: boolean }>({});
-
-  const togglePasswordReveal = (itemId: number) => {
-    setRevealedPasswords(prev => ({
-      ...prev,
-      [itemId]: !prev[itemId]
-    }));
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
 
   useEffect(() => {
     if (user && !user.masterPassphraseSetupComplete) {
@@ -113,8 +97,7 @@ const DashboardPage = () => {
       case 'Dashboard':
         return <DashboardOverview recentActivity={recentActivity} />;
       case 'Items':
-        if (selectedVault) setSelectedVault(null);
-        return <VaultsList vaults={vaults} setSelectedVault={setSelectedVault} />;
+        return <ItemList items={vaults} />;
       case 'Audits':
         return <AuditLogsTable auditLogs={auditLogs} />;
       case 'Security':
@@ -142,28 +125,7 @@ const DashboardPage = () => {
       <SidebarTrigger className='relative' />
       <main className="flex-1 px-2 py-8 -ml-6 mr-1 md:px-8 md:py-8 md:mr-2 w-max">
         {renderMainContent()}
-        {selectedVault && (
-          <VaultItemTable
-            selectedVault={selectedVault}
-            items={items.filter(i => i.vault === selectedVault.id)}
-            setSelectedItem={setSelectedItem}
-            setShareDialogOpen={setShareDialogOpen}
-          />
-        )}
       </main>
-
-      <ItemDrawer
-        selectedItem={selectedItem}
-        setSelectedItem={setSelectedItem}
-        revealedPasswords={revealedPasswords}
-        togglePasswordReveal={togglePasswordReveal}
-        copyToClipboard={copyToClipboard}
-      />
-
-      <ShareDialog
-        shareDialogOpen={shareDialogOpen}
-        setShareDialogOpen={setShareDialogOpen}
-      />
     </div>
   );
 };

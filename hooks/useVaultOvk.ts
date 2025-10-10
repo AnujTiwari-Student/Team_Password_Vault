@@ -23,24 +23,16 @@ export function useVaultOVK(
 
     async function fetchAndUnwrap(): Promise<void> {
       try {
-        console.log(`🔍 Fetching ${vaultType} vault key for id: ${id}`);
-
-        const response = await axios.get<VaultResponse>(
-          `/api/vaults/${vaultType}`,
-          {
-            params: { id },
-          }
-        );
+        const response = await axios.get<VaultResponse>(`/api/vaults/${vaultType}`, {
+          params: { id },
+        });
 
         const { ovk_cipher } = response.data;
-        if (!ovk_cipher) {
-          throw new Error("OVK cipher missing in response");
-        }
+
+        if (!ovk_cipher) throw new Error("OVK cipher missing in response");
 
         const unwrappedKey = await unwrapKey(ovk_cipher, umkCryptoKey!);
         setOvkCryptoKey(unwrappedKey);
-
-        console.log("✅ OVK successfully unwrapped");
       } catch (error) {
         if (axios.isAxiosError(error)) {
           const axiosError = error as AxiosError<{
@@ -50,13 +42,12 @@ export function useVaultOVK(
           const errorMsg =
             axiosError.response?.data?.error ?? "No error message from server";
           console.error(
-            `💥 Failed to fetch OVK (${axiosError.response?.status}): ${errorMsg}`
+            `Failed to fetch OVK (${axiosError.response?.status}): ${errorMsg}`
           );
         } else {
           const err = error as Error;
-          console.error(`❌ Error during OVK unwrapping:`, err.message, err);
+          console.error(`Error during OVK unwrapping:`, err.message, err);
         }
-
         setOvkCryptoKey(null);
       }
     }

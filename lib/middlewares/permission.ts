@@ -1,10 +1,9 @@
-
 import { prisma } from "@/db";
 import { MemberRole } from "@prisma/client";
 
 type TargetType = 'vault' | 'item';
 type Permission = 'view' | 'edit' | 'share' | 'manage';
-type Role = 'owner' | 'admin' | 'member' | 'viewer';
+type Role = MemberRole;
 
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     owner: ['view', 'edit', 'share', 'manage'],
@@ -21,58 +20,51 @@ export async function permissionCheck(
 ): Promise<boolean> {
     try {
         let orgId: string | null = null;
-        let vaultId: string | null = targetId;
+        let vaultId: string | null = null;
         
         if (targetType === 'item') {
-            const item = await prisma.item.findMany({ where: { vault_id: targetId } });
+            const item = await prisma.item.findUnique({ 
+                where: { id: targetId },
+                select: { vault_id: true }
+            });
             if (!item) return false;
-
-            vaultId = item[0].vault_id;
+            vaultId = item.vault_id;
+        } else {
+            vaultId = targetId;
         }
 
-        const vault = await prisma.vault.findUnique({ where: { id: vaultId } });
+        const vault = await prisma.vault.findUnique({ 
+            where: { id: vaultId },
+            select: { org_id: true }
+        });
         if (!vault) return false;
         
-        orgId = vault.org_id || userId; 
+        orgId = vault.org_id;
+        
+        if (!orgId) {
+            if (vault.org_id === userId) {
+                return true;
+            }
+            return false;
+        }
         
         const effectivePerms: Set<Permission> = new Set();
         
-        const membership = await prisma.membership.findFirst({ where: { user_id: userId, org_id: orgId } });
-        const userRole: MemberRole = (membership?.role as MemberRole) || 'viewer'; 
+        const membership = await prisma.membership.findFirst({ 
+            where: { user_id: userId, org_id: orgId },
+            select: { role: true }
+        });
+        
+        if (!membership) return false;
+        
+        const userRole: Role = membership.role as Role;
         
         ROLE_PERMISSIONS[userRole].forEach(p => effectivePerms.add(p));
 
-        if (userRole === 'owner' || userRole === 'admin') {
-            return effectivePerms.has(requiredPerm);
-        }
-
-        // --- 3. Check Explicit Shares (Vault or Item level) ---
-        // const shareRecords = await prisma.share.findMany({
-        //     $or: [
-        //         // Shares granted explicitly to this user for the target
-        //         { target_id: targetId, grantee_type: 'user', grantee_id: userId },
-        //         // Shares granted to the user's role for the target
-        //         { target_id: targetId, grantee_type: 'role', grantee_role: userRole },
-        //         // If checking an Item, also check shares on the parent Vault
-        //         ...(targetType === 'item' ? [
-        //             { target_id: vaultId, grantee_type: 'user', grantee_id: userId },
-        //             { target_id: vaultId, grantee_type: 'role', grantee_role: userRole }
-        //         ] : []),
-        //     ]
-        // });
-
-        // Combine permissions from all share records
-        // shareRecords.forEach(share => {
-        //     Object.keys(share.perms).filter(p => share.perms[p as Permission]).forEach(p => {
-        //         effectivePerms.add(p as Permission);
-        //     });
-        // });
-        
-        // // --- 4. Final Check ---
         return effectivePerms.has(requiredPerm);
 
     } catch (error) {
         console.error(`Permission check error for User ${userId}:`, error);
-        return false; // Fail safe on error
+        return false; 
     }
 }

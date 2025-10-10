@@ -3,7 +3,6 @@ import * as bip39 from "bip39";
 const PBKDF2_ITERATIONS = 100000;
 const AES_GCM_KEY_LENGTH = 256;
 const VERIFIER_LENGTH_BYTES = 32;
-
 const UMK_SALT_BYTES = 32;
 
 interface UMKData {
@@ -16,7 +15,6 @@ export const generateMnemonicPassphrase = (): string => {
   return bip39.generateMnemonic(256);
 };
 
-// In your utils/client-crypto.ts
 export const generateRandomBytes = (length: number): Uint8Array => {
   if (typeof crypto !== "undefined" && crypto.getRandomValues) {
     return crypto.getRandomValues(new Uint8Array(length));
@@ -25,8 +23,8 @@ export const generateRandomBytes = (length: number): Uint8Array => {
 };
 
 export const bufferToBase64 = (buffer: ArrayBuffer | Uint8Array): string => {
-  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   let binary = "";
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
   for (let i = 0; i < bytes.byteLength; i++) {
     binary += String.fromCharCode(bytes[i]);
   }
@@ -43,10 +41,20 @@ export const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
   return bytes.buffer;
 };
 
-export const deriveUMKData = async (masterKey: string): Promise<UMKData> => {
-  const saltBuffer = new Uint8Array(UMK_SALT_BYTES);
-  window.crypto.getRandomValues(saltBuffer);
-  const umk_salt = btoa(String.fromCharCode(...saltBuffer));
+export const deriveUMKData = async (
+  masterKey: string,
+  storedSaltBase64?: string
+): Promise<UMKData> => {
+  let saltBuffer: Uint8Array;
+  let umk_salt: string;
+
+  if (storedSaltBase64) {
+    umk_salt = storedSaltBase64;
+    saltBuffer = new Uint8Array(base64ToArrayBuffer(umk_salt));
+  } else {
+    saltBuffer = generateRandomBytes(UMK_SALT_BYTES);
+    umk_salt = bufferToBase64(saltBuffer);
+  }
 
   const encoder = new TextEncoder();
   const keyMaterial = await window.crypto.subtle.importKey(
@@ -60,7 +68,7 @@ export const deriveUMKData = async (masterKey: string): Promise<UMKData> => {
   const umkCryptoKey = await window.crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
-      salt: saltBuffer,
+      salt: saltBuffer.buffer as unknown as ArrayBuffer,
       iterations: PBKDF2_ITERATIONS,
       hash: "SHA-256",
     },
@@ -74,7 +82,7 @@ export const deriveUMKData = async (masterKey: string): Promise<UMKData> => {
   const hashBuffer = await window.crypto.subtle.digest("SHA-256", exportedKey);
 
   const master_passphrase_verifier = bufferToBase64(
-    hashBuffer.slice(0, VERIFIER_LENGTH_BYTES)
+    new Uint8Array(hashBuffer).slice(0, VERIFIER_LENGTH_BYTES)
   );
 
   return {
@@ -84,13 +92,16 @@ export const deriveUMKData = async (masterKey: string): Promise<UMKData> => {
   };
 };
 
-export const wrapKey = async (keyToWrap: string, wrappingKey: CryptoKey): Promise<string> => {
+export const wrapKey = async (
+  keyToWrap: string,
+  wrappingKey: CryptoKey
+): Promise<string> => {
   const keyBuffer = base64ToArrayBuffer(keyToWrap);
 
   const iv = new Uint8Array(generateRandomBytes(12));
-  
+
   const wrappedKeyBuffer = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv: iv }, 
+    { name: "AES-GCM", iv: iv },
     wrappingKey,
     keyBuffer
   );
@@ -108,8 +119,17 @@ export const unwrapKey = async (
 ): Promise<CryptoKey> => {
   const wrappedKeyWithIv = base64ToArrayBuffer(wrappedKeyBase64);
   const wrappedKeyView = new Uint8Array(wrappedKeyWithIv);
+
+  if (wrappedKeyView.byteLength < 13) {
+    console.error("Invalid wrapped key length:", wrappedKeyView.byteLength);
+    throw new Error("Wrapped key data too short");
+  }
+
   const iv = wrappedKeyView.slice(0, 12);
   const wrappedKey = wrappedKeyView.slice(12);
+
+  console.log("unwrapKey iv:", bufferToBase64(iv));
+  console.log("unwrapKey wrappedKey length:", wrappedKey.byteLength);
 
   const decryptedKeyBuffer = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: iv },
@@ -127,5 +147,3 @@ export const unwrapKey = async (
 
   return unwrappedKey;
 };
-
-
