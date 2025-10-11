@@ -1,4 +1,4 @@
-import { ItemType } from "@prisma/client";
+import { ItemType, MemberRole } from "@prisma/client";
 import * as z from "zod";
 
 const ERR_PASSWORD_REQ = "Password doesn't meet requirements";
@@ -104,4 +104,15 @@ export const ItemCreationSchema = z.object({
 });
 
 export type ItemCreationType = z.infer<typeof ItemCreationSchema>;
+
+export const CreateTeamSchema = z.object({
+  name: z.string().min(1, "Team name is required").max(50, "Team name must be less than 50 characters"),
+  description: z.string().max(200, "Description must be less than 200 characters").optional()
+});
+
+export const AddMemberSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  role: z.enum(["member", "admin", "owner", "viewer"])
+});
+
 

@@ -12,6 +12,7 @@ import { AppSidebar } from '@/components/ui/app-sidebar';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import VaultSetting from '@/components/vaults/VaultSetting'
 import { BillingComponent } from '@/components/settings/BillingComponent';
+import { TeamManagement } from '@/components/teams/TeamManagement';
 
 interface AuditLog {
   id: number;
@@ -73,12 +74,9 @@ const DashboardPage = () => {
         return <SecurityCenter />;
       case 'Settings':
         return <VaultSetting />
-        return (
-          <div className="p-4">
-            <h2 className="text-3xl font-bold mb-6">{activeTab}</h2>
-            <p>Content for the {activeTab} settings page.</p>
-          </div>
-        );
+      case "Members":
+        // @ts-expect-error Todo: Type missmatch
+        return <TeamManagement vault={user.vault} user={user} />
       default:
         return <DashboardOverview recentActivity={recentActivity} />;
     }

@@ -2,8 +2,6 @@
 
 import * as React from "react"
 import {
-  AudioWaveform,
-  Command,
   Frame,
   GalleryVerticalEnd,
   Map,
@@ -65,6 +63,21 @@ const data = {
         },
         {
           title: "Items",
+          url: "#",
+        },
+      ],
+    },
+    {
+      title: "Teams",
+      url: "#",
+      icon: Settings2,
+      items: [
+        {
+          title: "Members",
+          url: "#",
+        },
+        {
+          title: "Manage",
           url: "#",
         },
       ],

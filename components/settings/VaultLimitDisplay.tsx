@@ -27,13 +27,10 @@ export const VaultLimitsDisplay: React.FC<VaultLimitsDisplayProps> = ({ vault, u
   const getPlanLimits = (plan: PlanType, vaultType: 'personal' | 'org') => {
     const limits = {
       free: { vaults: 1, items: 5, members: 1 },
-      personal_pro: { vaults: 5, items: 1000, members: 1 },
-      org_basic: { vaults: 3, items: 500, members: 10 },
-      org_pro: { vaults: 10, items: 2000, members: 50 },
+      pro: { vaults: 10, items: 2000, members: 50 },
       enterprise: { vaults: 999, items: 10000, members: 999 }
     };
 
-    // @ts-expect-error Todo: Type missmatch
     return limits[plan];
   };
 
@@ -94,7 +91,6 @@ export const VaultLimitsDisplay: React.FC<VaultLimitsDisplayProps> = ({ vault, u
       </h3>
       
       <div className="space-y-6">
-        {/* Plan Info */}
         <div className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
           <div>
             <p className="font-medium text-white">Current Plan</p>
@@ -109,9 +105,7 @@ export const VaultLimitsDisplay: React.FC<VaultLimitsDisplayProps> = ({ vault, u
           </div>
         </div>
 
-        {/* Usage Stats */}
         <div className="space-y-4">
-          {/* Items */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-gray-300">Vault Items</span>
@@ -127,7 +121,6 @@ export const VaultLimitsDisplay: React.FC<VaultLimitsDisplayProps> = ({ vault, u
             </div>
           </div>
 
-          {/* Vaults (for personal accounts) */}
           {vault.type === 'personal' && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -145,7 +138,6 @@ export const VaultLimitsDisplay: React.FC<VaultLimitsDisplayProps> = ({ vault, u
             </div>
           )}
 
-          {/* Members (for org accounts) */}
           {vault.type === 'org' && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -164,7 +156,6 @@ export const VaultLimitsDisplay: React.FC<VaultLimitsDisplayProps> = ({ vault, u
           )}
         </div>
 
-        {/* Warnings */}
         {(stats.itemCount / limits.items) >= 0.9 && (
           <div className="flex items-start gap-3 p-3 bg-red-900/20 border border-red-700/30 rounded-lg">
             <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />

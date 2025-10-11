@@ -32,7 +32,6 @@ function VaultSetting() {
   return (
     <div className="w-full max-w-full overflow-x-hidden">
       <div className="space-y-4 md:space-y-6 p-3 md:p-4 lg:p-6 min-h-0">
-        {/* Header */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-4 border-b border-gray-700/50 pb-4">
           <div className="min-w-0 flex-shrink">
             <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-white truncate">{vault.name} Settings</h1>
@@ -47,7 +46,6 @@ function VaultSetting() {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
         <div className="flex flex-wrap gap-2 bg-gray-800/30 p-2 rounded-xl overflow-x-auto">
           <button
             onClick={() => setActiveTab('general')}
@@ -97,7 +95,6 @@ function VaultSetting() {
           )}
         </div>
 
-        {/* Tab Content */}
         <div className="space-y-4 md:space-y-6">
           {activeTab === 'general' && (
             <div className="space-y-4 md:space-y-6">

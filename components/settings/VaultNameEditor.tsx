@@ -57,6 +57,9 @@ export const VaultNameEditor: React.FC<VaultNameEditorProps> = ({ vault }) => {
         <div className="flex items-center gap-3">
           {isEditing ? (
             <div className="flex-1 flex items-center gap-3">
+
+              {/* Todo: Make a form to change vault name */}
+
               {/* <input
                 type="text"
                 value={vaultName}
