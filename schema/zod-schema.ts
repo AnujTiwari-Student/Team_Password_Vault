@@ -72,19 +72,35 @@ export const VaultCreationSchema = z.object({
 
 export type VaultCreationType = z.infer<typeof VaultCreationSchema>;
 
+export const ITEM_TYPES = ["login", "note", "totp"] as const;
+export type ItemTypeEnum = typeof ITEM_TYPES[number];
+
 export const ItemCreationSchema = z.object({
     mnemonic: z.string().min(1, "Mnemonic is required"),
     item_name: z.string().min(1, "Item name is required"),
-    item_url: z.string().url("Invalid URL"),
-    username_ct: z.string(),
+    item_url: z.string().optional(),
+    username_ct: z.string().optional(),
     password_ct: z.string().optional(),
     totp_seed_ct: z.string().optional(),
     vaultId: z.string(),
     item_key_wrapped: z.string().optional(),
-    type: z.enum(ItemType),
+    type: z.array(z.enum(ItemType)).min(1, "At least one item type is required"),
     tags: z.array(z.string()).optional(),
     notes_ct: z.string().optional(),
     created_by: z.string()
+}).refine((data) => {
+    if (data.type.includes('login') && !data.username_ct && !data.password_ct) {
+        return false;
+    }
+    if (data.type.includes('note') && !data.notes_ct) {
+        return false;
+    }
+    if (data.type.includes('totp') && !data.totp_seed_ct) {
+        return false;
+    }
+    return true;
+}, {
+    message: "Please fill required fields for selected item types"
 });
 
 export type ItemCreationType = z.infer<typeof ItemCreationSchema>;

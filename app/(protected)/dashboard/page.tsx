@@ -8,28 +8,9 @@ import { DashboardOverview } from '@/components/dashboard/DashboardOverview';
 import { ItemList } from '@/components/vaults/ItemList';
 import { AuditLogsTable } from '@/components/audit/AuditLogsTable';
 import { SecurityCenter } from '@/components/security/SecurityCenter';
-import { ItemDrawer } from '@/components/modals/ItemDrawer';
-import { ShareDialog } from '@/components/modals/ShareDialog';
 import { AppSidebar } from '@/components/ui/app-sidebar'; 
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import VaultSetting from '@/components/vaults/VaultSetting'
-
-interface Item {
-  id: number;
-  name: string;
-  url: string;
-  username: string;
-  password: string;
-  totp: string;
-  vault: number;
-}
-
-interface Vault {
-  id: number;
-  name: string;
-  items: number;
-  shared: boolean;
-}
 
 interface AuditLog {
   id: number;
@@ -45,20 +26,6 @@ interface RecentActivity {
   time: string;
   user: string;
 }
-
-
-const vaults: Vault[] = [
-  { id: 1, name: 'Personal', items: 24, shared: false },
-  { id: 2, name: 'Work Accounts', items: 18, shared: true },
-  { id: 3, name: 'Banking', items: 8, shared: false },
-  { id: 4, name: 'Social Media', items: 12, shared: false }
-];
-
-const items: Item[] = [
-  { id: 1, name: 'GitHub', url: 'github.com', username: 'john.doe@email.com', password: 'SecureP@ss123!', totp: '847293', vault: 1 },
-  { id: 2, name: 'AWS Console', url: 'aws.amazon.com', username: 'admin@company.com', password: 'AWS#Secure456', totp: '123456', vault: 2 },
-  { id: 3, name: 'Gmail', url: 'mail.google.com', username: 'personal@gmail.com', password: 'GooglePass789!', totp: '654321', vault: 1 }
-];
 
 const recentActivity: RecentActivity[] = [
   { action: 'Password updated', item: 'GitHub', time: '2 hours ago', user: 'You' },
@@ -97,7 +64,7 @@ const DashboardPage = () => {
       case 'Dashboard':
         return <DashboardOverview recentActivity={recentActivity} />;
       case 'Items':
-        return <ItemList items={vaults} />;
+        return <ItemList />;
       case 'Audits':
         return <AuditLogsTable auditLogs={auditLogs} />;
       case 'Security':
@@ -130,4 +97,4 @@ const DashboardPage = () => {
   );
 };
 
-export default DashboardPage;
+export default DashboardPage; 

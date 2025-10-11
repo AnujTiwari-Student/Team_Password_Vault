@@ -29,6 +29,8 @@ enum ItemType {
   login
   note
   totp
+
+  @@map("item_types")
 }
 
 enum ShareTargetType {
@@ -142,7 +144,7 @@ model Vault {
 model Item {
   id               String   @id @default(auto()) @map("_id") @db.ObjectId
   vault_id         String   @db.ObjectId
-  type             ItemType
+  type             ItemType[]
   name             String
   url              String?
   username_ct      String?
@@ -155,6 +157,8 @@ model Item {
   updated_at       DateTime @default(now())
   vault            Vault    @relation(fields: [vault_id], references: [id])
   creator          User     @relation("ItemCreator", fields: [created_by], references: [id])
+
+  @@map("item_types")
 }
 
 model Share {

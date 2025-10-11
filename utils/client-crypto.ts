@@ -147,3 +147,23 @@ export const unwrapKey = async (
 
   return unwrappedKey;
 };
+
+export const decryptData = async (encryptedDataBase64: string, itemKey: CryptoKey): Promise<string> => {
+  const encryptedWithIv = base64ToArrayBuffer(encryptedDataBase64);
+  const encryptedView = new Uint8Array(encryptedWithIv);
+
+  if (encryptedView.byteLength < 13) {
+    throw new Error("Encrypted data too short");
+  }
+
+  const iv = encryptedView.slice(0, 12);
+  const ciphertext = encryptedView.slice(12);
+
+  const decryptedBuffer = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: iv },
+    itemKey,
+    ciphertext
+  );
+
+  return new TextDecoder().decode(decryptedBuffer);
+};

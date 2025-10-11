@@ -1,4 +1,4 @@
-import { getVaultByOrgId } from './../data/vault-data';
+import { getVaultByOrgId } from "./../data/vault-data";
 import NextAuth, { type NextAuthResult } from "next-auth";
 import authConfig from "./auth.config";
 import { prisma } from "@/db";
@@ -6,14 +6,14 @@ import { getAccountByUserId } from "@/data/account-data";
 import { getUserById, updateUser } from "@/data/users-data";
 import { CustomOAuthAdapter } from "./custom-adapter";
 import { getOrgById } from "@/data/org-data";
-import { Org, Vault } from "@prisma/client";
+import { MemberRole, Membership, Org, Vault } from "@prisma/client";
 import { getVaultByUserId } from "@/data/vault-data";
+import { getMemberByOrgAndUserId } from "@/data/member-data";
 
 const result = NextAuth({
   ...authConfig,
   events: {
     async linkAccount({ user, account }) {
-
       console.log(`Account linked: ${account.provider} to user ${user.email}`);
 
       await updateUser(user.id as string);
@@ -21,7 +21,6 @@ const result = NextAuth({
   },
   callbacks: {
     async session({ session, token }) {
-      
       if (token.sub && session.user) {
         session.user.id = token.sub;
         session.user.email = token.email as string;
@@ -35,6 +34,17 @@ const result = NextAuth({
         session.user.org = token.org as Org;
         session.user.account_type = token.account_type as "org" | "personal";
         session.user.vault = token.vault as Vault;
+
+        if (token.member) {
+          const allMemberships = token.member;
+          const userMembership = (allMemberships as Membership[]).find(
+            (m) => m.user_id === token.sub
+          );
+
+          session.user.member = userMembership as Membership;
+        } else {
+          session.user.member = null;
+        }
       }
 
       console.log("Session callback - session:", session);
@@ -54,6 +64,16 @@ const result = NextAuth({
         token.org = org;
       }
 
+      const members = await getMemberByOrgAndUserId(
+        org?.id as string,
+        user.id as string
+      );
+      if (members && members.length > 0) {
+        token.member = members;
+      } else {
+        token.member = null;
+      }
+
       console.log("JWT callback - token before:", token);
       console.log("JWT callback - user:", user);
 
@@ -63,12 +83,12 @@ const result = NextAuth({
       token.name = user?.name as string;
       token.account_type = user?.account_type;
 
-      if(token.account_type === "personal") {
+      if (token.account_type === "personal") {
         const vault = await getVaultByUserId(user.id as string);
         if (vault) {
           token.vault = vault;
         }
-      }else if (token.account_type === "org") {
+      } else if (token.account_type === "org") {
         const vault = await getVaultByOrgId(org?.id as string);
         if (vault) {
           token.vault = vault;

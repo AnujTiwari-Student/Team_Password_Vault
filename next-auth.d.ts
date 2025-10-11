@@ -1,3 +1,4 @@
+import { MemberRole } from "@prisma/client";
 import NextAuth, { DefaultSession, DefaultUser } from "next-auth";
 
 declare module "next-auth" {
@@ -24,7 +25,15 @@ declare module "next-auth" {
         name: string;
         ovk_id: string;
         type: "org" | "personal";
-      }
+      },
+      member?: {
+        id: string;
+        role: MemberRole;
+        org_id?: string;
+        user_id?: string;
+        created_at: Date;
+        ovk_wrapped_for_user: string;
+      } | null;
     } & DefaultSession["user"];
   }
 
