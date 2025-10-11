@@ -14,13 +14,14 @@ import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { login } from "@/actions/login";
 import { toast } from "sonner";
+import { useSession } from "next-auth/react";
 
 type AuthFormValues = z.infer<typeof LoginSchema>;
 
 function LoginForm({error: propError}: {error?: string | null}) {
 
     const router = useRouter();
-    // const { update } = useSession();
+    const { update } = useSession();
     
     const [showPassword, setShowPassword] = React.useState(false);  
     const [error, setError] = React.useState<string | null>(null);
@@ -48,7 +49,10 @@ function LoginForm({error: propError}: {error?: string | null}) {
                 if (res.success) {
                     setSuccess(res.message || "Login successful!");
                     toast.success(res.message || "Login successful!");
-                    router.push("/");
+
+                    await update();
+
+                    router.push("/dashboard");
                 } else {
                     setError(res.errors?._form?.[0] || "Login failed. Please try again.");
                 }

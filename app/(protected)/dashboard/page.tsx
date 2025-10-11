@@ -11,6 +11,7 @@ import { SecurityCenter } from '@/components/security/SecurityCenter';
 import { AppSidebar } from '@/components/ui/app-sidebar'; 
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import VaultSetting from '@/components/vaults/VaultSetting'
+import { BillingComponent } from '@/components/settings/BillingComponent';
 
 interface AuditLog {
   id: number;
@@ -41,6 +42,7 @@ const auditLogs: AuditLog[] = [
 ];
 
 const DashboardPage = () => {
+  
   const user = useCurrentUser();
 
   const [activeTab, setActiveTab] = useState('Dashboard');
@@ -71,7 +73,6 @@ const DashboardPage = () => {
         return <SecurityCenter />;
       case 'Settings':
         return <VaultSetting />
-      case 'Billing':
         return (
           <div className="p-4">
             <h2 className="text-3xl font-bold mb-6">{activeTab}</h2>

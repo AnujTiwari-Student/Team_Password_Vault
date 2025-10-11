@@ -67,10 +67,6 @@ const data = {
           title: "Items",
           url: "#",
         },
-        {
-          title: "Billing",
-          url: "#",
-        },
       ],
     },
   ],

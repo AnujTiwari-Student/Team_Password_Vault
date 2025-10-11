@@ -68,7 +68,7 @@ export async function POST(request: Request) {
           data: {
             org_id: newOrg.id,
             user_id: userId,
-            role: "admin",
+            role: "owner",
             ovk_wrapped_for_user,
           },
         });
