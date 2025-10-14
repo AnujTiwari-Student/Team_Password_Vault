@@ -17,7 +17,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<APIRespon
     const data = await request.json();
     const validatedData = AddMemberSchema.parse(data);
 
-    const membership = await prisma.membership.findFirst({
+    const canAddMember = await prisma.membership.findFirst({
       where: {
         user_id: session.user.id,
         org_id: data.org_id,
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<APIRespon
       }
     });
 
-    if (!membership) {
+    if (!canAddMember) {
       return NextResponse.json({
         success: false,
         errors: { _form: ["Organization not found or insufficient permissions"] }

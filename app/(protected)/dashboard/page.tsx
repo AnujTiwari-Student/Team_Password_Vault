@@ -11,8 +11,8 @@ import { SecurityCenter } from '@/components/security/SecurityCenter';
 import { AppSidebar } from '@/components/ui/app-sidebar'; 
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import VaultSetting from '@/components/vaults/VaultSetting'
-import { BillingComponent } from '@/components/settings/BillingComponent';
 import { TeamManagement } from '@/components/teams/TeamManagement';
+import { OrganizationManagement } from '@/components/org/OrganizationManagement';
 
 interface AuditLog {
   id: number;
@@ -77,6 +77,9 @@ const DashboardPage = () => {
       case "Members":
         // @ts-expect-error Todo: Type missmatch
         return <TeamManagement vault={user.vault} user={user} />
+      case "Manage":
+        // @ts-expect-error Todo: Type missmatch
+        return <OrganizationManagement user={user} orgId={user.org.id} />
       default:
         return <DashboardOverview recentActivity={recentActivity} />;
     }

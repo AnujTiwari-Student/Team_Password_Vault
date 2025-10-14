@@ -29,8 +29,6 @@ enum ItemType {
   login
   note
   totp
-
-  @@map("item_types")
 }
 
 enum ShareTargetType {
@@ -49,6 +47,13 @@ enum AuditSubjectType {
   item
   member
   invite
+}
+
+enum InviteStatus {
+  pending
+  accepted
+  rejected
+  expired
 }
 
 model User {
@@ -75,6 +80,11 @@ model User {
   audits                     Audit[]      @relation("AuditActor")
   invitesSent                Invite[]     @relation("InvitedBy")
   logs                       Logs[]
+  created_teams              Team[]       @relation("TeamCreator")
+
+  @@index([account_type])
+  @@index([created_at])
+  @@index([auth_provider])
 }
 
 model Account {
@@ -93,6 +103,7 @@ model Account {
   user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Org {
@@ -105,6 +116,11 @@ model Org {
   vaults        Vault[]
   invites       Invite[]
   audits        Audit[]
+  teams         Team[]     
+
+  @@index([owner_user_id])
+  @@index([created_at])
+  @@index([name])
 }
 
 model Membership {
@@ -117,7 +133,33 @@ model Membership {
   org                  Org        @relation(fields: [org_id], references: [id])
   user                 User       @relation(fields: [user_id], references: [id])
 
-  @@index([org_id, user_id])
+  @@unique([org_id, user_id])
+  @@index([org_id])
+  @@index([user_id])
+  @@index([role])
+  @@index([created_at])
+}
+
+model Team {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String?
+  org_id      String   @db.ObjectId
+  vault_id    String   @db.ObjectId
+  created_by  String   @db.ObjectId
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  org             Org   @relation(fields: [org_id], references: [id])
+  vault           Vault @relation(fields: [vault_id], references: [id])
+  created_by_user User  @relation("TeamCreator", fields: [created_by], references: [id])
+
+  @@unique([org_id, name])
+  @@index([org_id])
+  @@index([vault_id])
+  @@index([created_by])
+  @@index([created_at])
+  @@index([org_id, vault_id])
 }
 
 model Vault {
@@ -136,14 +178,20 @@ model Vault {
   orgVaultKeyId      String?           @db.ObjectId
   PersonalVaultKey   PersonalVaultKey? @relation(fields: [personalVaultKeyId], references: [id])
   personalVaultKeyId String?           @db.ObjectId
+  teams              Team[]            
 
   @@unique([org_id, name])
   @@unique([user_id, name])
+  @@index([org_id])
+  @@index([user_id])
+  @@index([type])
+  @@index([created_at])
+  @@index([ovk_id])
 }
 
 model Item {
-  id               String   @id @default(auto()) @map("_id") @db.ObjectId
-  vault_id         String   @db.ObjectId
+  id               String     @id @default(auto()) @map("_id") @db.ObjectId
+  vault_id         String     @db.ObjectId
   type             ItemType[]
   name             String
   url              String?
@@ -153,12 +201,20 @@ model Item {
   totp_seed_ct     String?
   item_key_wrapped String
   tags             String[]
-  created_by       String   @db.ObjectId
-  updated_at       DateTime @default(now())
-  vault            Vault    @relation(fields: [vault_id], references: [id])
-  creator          User     @relation("ItemCreator", fields: [created_by], references: [id])
+  created_by       String     @db.ObjectId
+  updated_at       DateTime   @default(now())
+  vault            Vault      @relation(fields: [vault_id], references: [id])
+  creator          User       @relation("ItemCreator", fields: [created_by], references: [id])
 
-  @@map("item_types")
+  @@index([vault_id])
+  @@index([created_by])
+  @@index([type])
+  @@index([updated_at])
+  @@index([tags])
+  @@index([name])
+  @@index([vault_id, type])
+  @@index([vault_id, updated_at])
+  @@map("item_types") 
 }
 
 model Share {
@@ -176,6 +232,12 @@ model Share {
   granteeUser  User?            @relation("ShareGranteeUser", fields: [grantee_id], references: [id])
   Vault        Vault?           @relation(fields: [vaultId], references: [id])
   vaultId      String?          @db.ObjectId
+
+  @@index([target_type, target_id])
+  @@index([grantee_type, grantee_id])
+  @@index([grantee_role])
+  @@index([created_at])
+  @@index([vaultId])
 }
 
 model Audit {
@@ -191,6 +253,15 @@ model Audit {
   meta          Json
   org           Org              @relation(fields: [org_id], references: [id])
   actor         User             @relation("AuditActor", fields: [actor_user_id], references: [id])
+
+  @@index([org_id])
+  @@index([actor_user_id])
+  @@index([action])
+  @@index([subject_type])
+  @@index([ts])
+  @@index([org_id, ts])
+  @@index([actor_user_id, ts])
+  @@index([subject_type, subject_id])
 }
 
 model Logs {
@@ -203,20 +274,35 @@ model Logs {
   ts           DateTime @default(now())
   meta         Json
   user         User     @relation(fields: [user_id], references: [id])
+
+  @@index([user_id])
+  @@index([action])
+  @@index([subject_type])
+  @@index([ts])
+  @@index([user_id, ts])
+  @@index([action, ts])
 }
 
 model Invite {
-  id         String     @id @default(auto()) @map("_id") @db.ObjectId
-  org_id     String     @db.ObjectId
+  id         String       @id @default(auto()) @map("_id") @db.ObjectId
+  org_id     String       @db.ObjectId
   email      String
-  role       MemberRole @default(member)
-  token      String     @unique
+  role       MemberRole   @default(member)
+  status     InviteStatus @default(pending) 
+  token      String       @unique @default(cuid()) 
   expires_at DateTime
-  invited_by String     @db.ObjectId
-  org        Org        @relation(fields: [org_id], references: [id])
-  invitedBy  User       @relation("InvitedBy", fields: [invited_by], references: [id])
+  invited_by String       @db.ObjectId
+  created_at DateTime     @default(now()) 
+  org        Org          @relation(fields: [org_id], references: [id])
+  invitedBy  User         @relation("InvitedBy", fields: [invited_by], references: [id])
 
+  @@index([org_id])
+  @@index([email])
+  @@index([status]) 
+  @@index([expires_at])
+  @@index([invited_by])
   @@index([org_id, email])
+  @@index([status, expires_at])
 }
 
 model OrgVaultKey {
@@ -225,6 +311,9 @@ model OrgVaultKey {
   ovk_cipher String
   created_at DateTime @default(now())
   vaults     Vault[]
+
+  @@index([org_id])
+  @@index([created_at])
 }
 
 model PersonalVaultKey {
@@ -233,4 +322,7 @@ model PersonalVaultKey {
   ovk_cipher String
   created_at DateTime @default(now())
   vaults     Vault[]
+
+  @@index([user_id])
+  @@index([created_at])
 }
