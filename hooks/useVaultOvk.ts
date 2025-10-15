@@ -4,14 +4,19 @@ import { useState, useEffect } from "react";
 
 type VaultType = "org" | "personal" | undefined;
 
-interface VaultResponse {
+interface OrgVaultResponse {
+  ovk_wrapped_for_user: string;
+}
+
+interface PersonalVaultResponse {
   ovk_cipher: string;
 }
 
 export function useVaultOVK(
   umkCryptoKey: CryptoKey | null,
   id: string | null,
-  vaultType: VaultType
+  vaultType: VaultType,
+  privateKeyBase64?: string | null
 ) {
   const [ovkCryptoKey, setOvkCryptoKey] = useState<CryptoKey | null>(null);
 
@@ -23,16 +28,32 @@ export function useVaultOVK(
 
     async function fetchAndUnwrap(): Promise<void> {
       try {
-        const response = await axios.get<VaultResponse>(`/api/vaults/${vaultType}`, {
-          params: { id },
-        });
+        if (vaultType === "org") {
+          const response = await axios.get<OrgVaultResponse>(`/api/vaults/org`, {
+            params: { id },
+          });
 
-        const { ovk_cipher } = response.data;
+          const { ovk_wrapped_for_user } = response.data;
+          
+          if (!ovk_wrapped_for_user) throw new Error("OVK wrapped for user missing in response");
+          
+          if (!privateKeyBase64) throw new Error("Private key required for org vault");
 
-        if (!ovk_cipher) throw new Error("OVK cipher missing in response");
+          const unwrappedKey = await unwrapKey(ovk_wrapped_for_user, privateKeyBase64);
+          setOvkCryptoKey(unwrappedKey);
 
-        const unwrappedKey = await unwrapKey(ovk_cipher, umkCryptoKey!);
-        setOvkCryptoKey(unwrappedKey);
+        } else {
+          const response = await axios.get<PersonalVaultResponse>(`/api/vaults/personal`, {
+            params: { id },
+          });
+
+          const { ovk_cipher } = response.data;
+          if (!ovk_cipher) throw new Error("OVK cipher missing in response");
+
+          const unwrappedKey = await unwrapKey(ovk_cipher, umkCryptoKey!);
+          setOvkCryptoKey(unwrappedKey);
+        }
+
       } catch (error) {
         if (axios.isAxiosError(error)) {
           const axiosError = error as AxiosError<{
@@ -53,7 +74,7 @@ export function useVaultOVK(
     }
 
     fetchAndUnwrap();
-  }, [id, vaultType, umkCryptoKey]);
+  }, [id, vaultType, umkCryptoKey, privateKeyBase64]);
 
   return ovkCryptoKey;
 }

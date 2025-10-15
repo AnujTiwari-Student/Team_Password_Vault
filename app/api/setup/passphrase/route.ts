@@ -19,15 +19,21 @@ export async function POST(request: Request) {
     umk_salt,
     master_passphrase_verifier,
     ovk_wrapped_for_user,
+    ovk_raw,
+    ovk_wrapped_for_org,
     org_name,
     account_type,
+    public_key, 
+    wrapped_private_key,
   } = body;
 
   if (
     !umk_salt ||
     !master_passphrase_verifier ||
     !ovk_wrapped_for_user ||
-    !account_type
+    !account_type ||
+    !public_key || 
+    !wrapped_private_key
   ) {
     console.warn(
       "Received incomplete key material for setup:",
@@ -35,8 +41,16 @@ export async function POST(request: Request) {
     );
     return NextResponse.json(
       {
-        error:
-          "Missing required client-side generated key materials or Organization Name.",
+        error: "Missing required client-side generated key materials.",
+      },
+      { status: 400 }
+    );
+  }
+
+  if (account_type === "org" && (!org_name || !ovk_raw || !ovk_wrapped_for_org)) {
+    return NextResponse.json(
+      {
+        error: "Organization setup requires org_name, ovk_raw, and ovk_wrapped_for_org.",
       },
       { status: 400 }
     );
@@ -52,8 +66,21 @@ export async function POST(request: Request) {
           umk_salt,
           master_passphrase_verifier,
           account_type,
+          public_key,
         },
         select: { id: true, email: true, name: true },
+      });
+
+      await tx.logs.create({
+        data: {
+          user_id: userId,
+          action: "STORE_PRIVATE_KEY",
+          subject_type: "CRYPTO_SETUP",
+          meta: {
+            wrapped_private_key: wrapped_private_key,
+            setup_timestamp: new Date().toISOString()
+          }
+        }
       });
 
       if (account_type === "org") {
@@ -69,14 +96,14 @@ export async function POST(request: Request) {
             org_id: newOrg.id,
             user_id: userId,
             role: "owner",
-            ovk_wrapped_for_user,
+            ovk_wrapped_for_user: ovk_wrapped_for_org,
           },
         });
 
         const orgVaultKey = await tx.orgVaultKey.create({
           data: {
             org_id: newOrg.id,
-            ovk_cipher: ovk_wrapped_for_user,
+            ovk_cipher: ovk_raw,
           },
         });
 
@@ -86,6 +113,7 @@ export async function POST(request: Request) {
             name: `${org_name} Vault`,
             type: "org",
             ovk_id: orgVaultKey.id,
+            orgVaultKeyId: orgVaultKey.id,
           },
         });
 
@@ -119,6 +147,7 @@ export async function POST(request: Request) {
             type: "personal",
             user_id: userId,
             ovk_id: personalVaultKey.id,
+            personalVaultKeyId: personalVaultKey.id,
           },
         });
 
@@ -142,9 +171,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        message:
-          "Setup complete: Master Passphrase, User, Org, and Membership created.",
-          result,
+        message: "Setup complete: Master Passphrase, User, Org, and Membership created.",
+        result,
+        orgId: result[1]?.id || null,
       },
       { status: 200 }
     );

@@ -115,8 +115,28 @@ export const wrapKey = async (
 
 export const unwrapKey = async (
   wrappedKeyBase64: string,
-  wrappingKey: CryptoKey
+  wrappingKey: CryptoKey | string
 ): Promise<CryptoKey> => {
+
+  if (typeof wrappingKey === 'string') {
+    const privateKey = await importRSAPrivateKey(wrappingKey);
+    const wrappedBuffer = base64ToArrayBuffer(wrappedKeyBase64);
+    
+    const decryptedBuffer = await window.crypto.subtle.decrypt(
+      { name: "RSA-OAEP" },
+      privateKey,
+      wrappedBuffer
+    );
+    
+    return await window.crypto.subtle.importKey(
+      "raw",
+      decryptedBuffer,
+      { name: "AES-GCM", length: 256 },
+      true,
+      ["encrypt", "decrypt", "wrapKey", "unwrapKey"]
+    );
+  }
+
   const wrappedKeyWithIv = base64ToArrayBuffer(wrappedKeyBase64);
   const wrappedKeyView = new Uint8Array(wrappedKeyWithIv);
 
@@ -133,7 +153,7 @@ export const unwrapKey = async (
 
   const decryptedKeyBuffer = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: iv },
-    wrappingKey,
+    wrappingKey as CryptoKey,
     wrappedKey
   );
 
@@ -167,3 +187,75 @@ export const decryptData = async (encryptedDataBase64: string, itemKey: CryptoKe
 
   return new TextDecoder().decode(decryptedBuffer);
 };
+
+export const generateRSAKeyPair = async (): Promise<{ publicKey: string; privateKey: string }> => {
+  const keyPair = await window.crypto.subtle.generateKey(
+    {
+      name: "RSA-OAEP",
+      modulusLength: 2048,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: "SHA-256",
+    },
+    true,
+    ["encrypt", "decrypt"]
+  );
+
+  const publicKeyBuffer = await window.crypto.subtle.exportKey("spki", keyPair.publicKey);
+  const privateKeyBuffer = await window.crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
+
+  return {
+    publicKey: bufferToBase64(publicKeyBuffer),
+    privateKey: bufferToBase64(privateKeyBuffer)
+  };
+};
+
+export const importRSAPublicKey = async (publicKeyBase64: string): Promise<CryptoKey> => {
+  const publicKeyBuffer = base64ToArrayBuffer(publicKeyBase64);
+  return await window.crypto.subtle.importKey(
+    "spki",
+    publicKeyBuffer,
+    { name: "RSA-OAEP", hash: "SHA-256" },
+    false,
+    ["encrypt"]
+  );
+};
+
+export const importRSAPrivateKey = async (privateKeyBase64: string): Promise<CryptoKey> => {
+  const privateKeyBuffer = base64ToArrayBuffer(privateKeyBase64);
+  return await window.crypto.subtle.importKey(
+    "pkcs8",
+    privateKeyBuffer,
+    { name: "RSA-OAEP", hash: "SHA-256" },
+    false,
+    ["decrypt"]
+  );
+};
+
+
+export const encryptWithRSA = async (data: string, publicKeyBase64: string): Promise<string> => {
+  const publicKey = await importRSAPublicKey(publicKeyBase64);
+  const dataBuffer = base64ToArrayBuffer(data);
+  
+  const encryptedBuffer = await window.crypto.subtle.encrypt(
+    { name: "RSA-OAEP" },
+    publicKey,
+    dataBuffer
+  );
+  
+  return bufferToBase64(encryptedBuffer);
+};
+
+export const decryptWithRSA = async (encryptedData: string, privateKeyBase64: string): Promise<string> => {
+  const privateKey = await importRSAPrivateKey(privateKeyBase64);
+  const encryptedBuffer = base64ToArrayBuffer(encryptedData);
+  
+  const decryptedBuffer = await window.crypto.subtle.decrypt(
+    { name: "RSA-OAEP" },
+    privateKey,
+    encryptedBuffer
+  );
+  
+  return bufferToBase64(decryptedBuffer);
+};
+
+

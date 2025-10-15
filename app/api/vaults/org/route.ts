@@ -1,29 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrgOvkCypherKey } from "@/data/cyper-key-data";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/db";
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const orgId = searchParams.get("id");
-
-  console.log("API hit for org vault key:", orgId);
-
-  if (!orgId) {
-    return NextResponse.json({ error: "Invalid orgId type", status: 400 }, { status: 400 });
-  }
-
   try {
-    const orgVaultKey = await getOrgOvkCypherKey(orgId);
-    if (!orgVaultKey) {
-      console.warn(`❌ Org vault key not found for orgId: ${orgId}`);
-      return NextResponse.json({ error: "Org vault key not found", status: 404 }, { status: 404 });
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized", status: 401 }, { status: 401 });
     }
 
-    console.log("✅ orgVaultKey found:", orgVaultKey);
-    return NextResponse.json({ ovk_cipher: orgVaultKey.ovk_cipher });
+    const { searchParams } = new URL(req.url);
+    const vaultId = searchParams.get("id");
+
+    if (!vaultId) {
+      return NextResponse.json({ error: "Invalid vault ID", status: 400 }, { status: 400 });
+    }
+
+    const membership = await prisma.membership.findFirst({
+      where: {
+        user_id: session.user.id,
+        org: {
+          vaults: {
+            some: { id: vaultId }
+          }
+        }
+      },
+      select: {
+        ovk_wrapped_for_user: true
+      }
+    });
+
+    if (!membership?.ovk_wrapped_for_user) {
+      return NextResponse.json({ error: "Vault access denied", status: 403 }, { status: 403 });
+    }
+
+    return NextResponse.json({ 
+      ovk_wrapped_for_user: membership.ovk_wrapped_for_user 
+    });
+
   } catch (error) {
-    console.error("💥 Error fetching org vault key:", error);
+    console.error("Error fetching org vault key:", error);
     return NextResponse.json(
-      { error: "Internal server error while fetching org vault key", status: 500 },
+      { error: "Internal server error", status: 500 },
       { status: 500 }
     );
   }

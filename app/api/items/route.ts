@@ -38,7 +38,6 @@ export async function POST(req: NextRequest) {
             type, 
             tags, 
             item_key_wrapped, 
-            created_by, 
             ...ciphertextFields 
         } = body;
 

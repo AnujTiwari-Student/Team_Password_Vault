@@ -16,7 +16,9 @@ import {
   deriveUMKData,
   generateMnemonicPassphrase,
   generateRandomBytes,
+  generateRSAKeyPair,
   wrapKey,
+  encryptWithRSA,
 } from "@/utils/client-crypto";
 import { useClipboard } from "@/hooks/useClipboard";
 import { toast } from "sonner";
@@ -35,11 +37,15 @@ const MasterPassphraseSetup: React.FC = () => {
   const [salt, setSalt] = useState<string | null>(null);
   const [verifier, setVerifier] = useState<string | null>(null);
   const [ovkWrapped, setOvkWrapped] = useState<string | null>(null);
+  const [ovkRaw, setOvkRaw] = useState<string | null>(null);
+  const [ovkWrappedForOrg, setOvkWrappedForOrg] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [orgName, setOrgName] = useState("");
   const [status, setStatus] = useState("");
   const [showKey, setShowKey] = useState(true);
   const [accountType, setAccountType] = useState("org");
+  const [publicKey, setPublicKey] = useState<string | null>(null);
+  const [wrappedPrivateKey, setWrappedPrivateKey] = useState<string | null>(null);
 
   const { isCopied, copy } = useClipboard({ successDuration: 100000 });
 
@@ -60,15 +66,21 @@ const MasterPassphraseSetup: React.FC = () => {
       setSalt(umkData.umk_salt);
       setVerifier(umkData.master_passphrase_verifier);
 
-      console.log("UMK Data:", umkData);
+      setStatus("Generating RSA key");
+      const { publicKey, privateKey } = await generateRSAKeyPair();
+      const wrappedPrivateKey = await wrapKey(privateKey, umkData.umkCryptoKey);
 
       const ovkRaw = generateRandomBytes(32);
       const ovkRawBase64 = bufferToBase64(ovkRaw);
 
-      const wrappedOVK = await wrapKey(ovkRawBase64, umkData.umkCryptoKey);
-      setOvkWrapped(wrappedOVK);
+      const wrappedOVKForPersonal = await wrapKey(ovkRawBase64, umkData.umkCryptoKey);
+      const wrappedOVKForOrg = await encryptWithRSA(ovkRawBase64, publicKey);
 
-      console.log("OVK Wrapped:", wrappedOVK);
+      setOvkWrapped(wrappedOVKForPersonal);
+      setOvkRaw(ovkRawBase64);
+      setOvkWrappedForOrg(wrappedOVKForOrg);
+      setPublicKey(publicKey);
+      setWrappedPrivateKey(wrappedPrivateKey);
 
       setStatus("Ready. Please copy your Master Key.");
     } catch (error) {
@@ -81,9 +93,7 @@ const MasterPassphraseSetup: React.FC = () => {
     if (!mnemonic) {
       runSetup();
     }
-
-    return () => {
-    };
+    return () => {};
   }, [mnemonic, runSetup]);
 
   useEffect(() => {
@@ -101,12 +111,19 @@ const MasterPassphraseSetup: React.FC = () => {
     if (accountType === "org" && !orgName.trim()) return;
 
     let ovkToSend = ovkWrapped;
+    let ovkForOrgToSend = ovkWrappedForOrg;
+    let ovkRawToSend = ovkRaw;
+
     if (!ovkToSend) {
       if (ovkCryptoKey && umkCryptoKey) {
         try {
           const exportedRaw = await window.crypto.subtle.exportKey("raw", ovkCryptoKey);
           const rawBase64 = bufferToBase64(exportedRaw);
           ovkToSend = await wrapKey(rawBase64, umkCryptoKey);
+          ovkRawToSend = rawBase64;
+          if (publicKey) {
+            ovkForOrgToSend = await encryptWithRSA(rawBase64, publicKey);
+          }
         } catch (error) {
           setStatus("Error wrapping OVK for submission.");
           console.error(error);
@@ -118,22 +135,27 @@ const MasterPassphraseSetup: React.FC = () => {
       }
     }
 
-
     const body =
       accountType === "org"
         ? {
-          umk_salt: salt,
-          master_passphrase_verifier: verifier,
-          ovk_wrapped_for_user: ovkToSend,
-          org_name: orgName || null,
-          account_type: accountType,
-        }
+            umk_salt: salt,
+            master_passphrase_verifier: verifier,
+            ovk_wrapped_for_user: ovkToSend,
+            ovk_raw: ovkRawToSend,
+            ovk_wrapped_for_org: ovkForOrgToSend,
+            org_name: orgName || null,
+            account_type: accountType,
+            public_key: publicKey,
+            wrapped_private_key: wrappedPrivateKey
+          }
         : {
-          umk_salt: salt,
-          master_passphrase_verifier: verifier,
-          ovk_wrapped_for_user: ovkToSend,
-          account_type: accountType,
-        };
+            umk_salt: salt,
+            master_passphrase_verifier: verifier,
+            ovk_wrapped_for_user: ovkToSend,
+            account_type: accountType,
+            public_key: publicKey,
+            wrapped_private_key: wrappedPrivateKey
+          };
 
     setIsProcessing(true);
     setStatus("Sending secrets metadata and creating organization...");
@@ -147,47 +169,31 @@ const MasterPassphraseSetup: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-
         setStatus(`Success! Org created: ${data.orgId}. Redirecting in 5 seconds...`);
         toast.success("Organization created successfully!");
-
         setIsProcessing(false);
-
-        await update(); 
-
+        await update();
         router.push("/dashboard");
-
       } else {
         const errorData = await response.json();
         setStatus(`API Error: ${errorData.error || response.statusText}`);
-        setIsProcessing(false); 
+        setIsProcessing(false);
       }
     } catch (error) {
       setStatus("Network or client-side error during API call.");
       console.error("API call failed:", error);
-      setIsProcessing(false); 
+      setIsProcessing(false);
     }
   };
 
-  const isReady =
-    Boolean(mnemonic && salt && verifier && (ovkWrapped || ovkCryptoKey));
+  const isReady = Boolean(
+    mnemonic && salt && verifier && (ovkWrapped || ovkCryptoKey)
+  );
   const canProceed =
     isReady &&
     !isProcessing &&
     isCopied &&
     (accountType === "personal" || orgName.trim().length > 0);
-
-  useEffect(() => {
-    console.log({
-      accountType,
-      orgName,
-      isCopied,
-      isReady,
-      isProcessing,
-      canProceed,
-    });
-  }, [accountType, orgName, isCopied, isReady, isProcessing, canProceed]);
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-slate-900 to-gray-800 flex items-center justify-center p-4 sm:p-6">
@@ -199,9 +205,7 @@ const MasterPassphraseSetup: React.FC = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold text-white">Zero-Knowledge Setup</h1>
-              <p className="text-xs text-gray-400 mt-0.5">
-                End-to-end encrypted security
-              </p>
+              <p className="text-xs text-gray-400 mt-0.5">End-to-end encrypted security</p>
             </div>
           </div>
           <div className="mb-8 bg-gray-800 border border-gray-700 rounded-xl p-5">
@@ -210,9 +214,10 @@ const MasterPassphraseSetup: React.FC = () => {
               <div className="text-sm">
                 <p className="text-gray-300 leading-relaxed">
                   Your account is secure, but you must first generate your{" "}
-                  <strong className="text-white">Master Key</strong>. This 24-word
-                  phrase is the <strong className="text-white">only</strong> way
-                  to decrypt your organizations secrets.
+                  <strong className="text-white">Master Key</strong>. This
+                  24-word phrase is the{" "}
+                  <strong className="text-white">only</strong> way to decrypt
+                  your organizations secrets.
                 </p>
                 <p className="text-red-400 font-semibold mt-3 flex items-center">
                   <Lock className="w-4 h-4 mr-2" />
@@ -243,10 +248,11 @@ const MasterPassphraseSetup: React.FC = () => {
                 </button>
                 <button
                   onClick={handleCopy}
-                  className={`px-4 py-2 text-sm font-semibold rounded-lg flex items-center transition-all duration-200 ${isCopied
+                  className={`px-4 py-2 text-sm font-semibold rounded-lg flex items-center transition-all duration-200 ${
+                    isCopied
                       ? "bg-green-600 text-white shadow-lg"
                       : "bg-blue-600 text-white hover:bg-blue-700 shadow-lg"
-                    }`}
+                  }`}
                   disabled={!isReady || isProcessing}
                 >
                   {isCopied ? (
@@ -264,10 +270,11 @@ const MasterPassphraseSetup: React.FC = () => {
               </div>
             </div>
             <div
-              className={`font-mono text-sm break-words p-4 bg-gray-950 border border-gray-700 rounded-lg transition-all duration-200 ${showKey
+              className={`font-mono text-sm break-words p-4 bg-gray-950 border border-gray-700 rounded-lg transition-all duration-200 ${
+                showKey
                   ? "text-gray-200 select-all"
                   : "text-transparent select-none blur-sm"
-                }`}
+              }`}
             >
               {mnemonic || "Generating your secure master key..."}
             </div>
@@ -318,8 +325,9 @@ const MasterPassphraseSetup: React.FC = () => {
           )}
           <div className="mt-6 p-4 bg-gray-800 border border-gray-700 rounded-lg">
             <p className="text-xs text-gray-400 text-center leading-relaxed">
-              🔒 Your master key is generated locally and never transmitted to our
-              servers. Store it in a secure password manager or offline location.
+              🔒 Your master key is generated locally and never transmitted to
+              our servers. Store it in a secure password manager or offline
+              location.
             </p>
           </div>
         </div>

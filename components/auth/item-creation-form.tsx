@@ -203,9 +203,8 @@ function ItemCreationForm() {
         })
     }, [ovkCryptoKey, form, selectedTypes, tags]);
 
-    // Helper functions to determine what fields to show
     const needsURL = selectedTypes.includes('login') || selectedTypes.includes('totp');
-    const needsUsername = selectedTypes.length > 0; // Username can be useful for any type
+    const needsUsername = selectedTypes.length > 0; 
     const needsPassword = selectedTypes.includes('login');
     const needsTOTP = selectedTypes.includes('totp');
     const needsNote = selectedTypes.includes('note');
@@ -347,7 +346,6 @@ function ItemCreationForm() {
                                         </h3>
                                     </div>
 
-                                    {/* Shared/Common Fields */}
                                     {needsURL && (
                                         <FormField
                                             control={form.control}
@@ -533,7 +531,6 @@ function ItemCreationForm() {
                 </div>
             </div>
 
-            {/* Fixed Footer with Submit Button */}
             <div className="flex-shrink-0 pt-4 border-t border-gray-700/50 mt-4">
                 <Button
                     type='submit'
