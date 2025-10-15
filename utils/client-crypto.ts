@@ -117,55 +117,93 @@ export const unwrapKey = async (
   wrappedKeyBase64: string,
   wrappingKey: CryptoKey | string
 ): Promise<CryptoKey> => {
-
+  
   if (typeof wrappingKey === 'string') {
-    const privateKey = await importRSAPrivateKey(wrappingKey);
-    const wrappedBuffer = base64ToArrayBuffer(wrappedKeyBase64);
-    
-    const decryptedBuffer = await window.crypto.subtle.decrypt(
-      { name: "RSA-OAEP" },
-      privateKey,
-      wrappedBuffer
-    );
-    
-    return await window.crypto.subtle.importKey(
-      "raw",
-      decryptedBuffer,
-      { name: "AES-GCM", length: 256 },
-      true,
-      ["encrypt", "decrypt", "wrapKey", "unwrapKey"]
-    );
+    try {
+      const privateKeyBuffer = base64ToArrayBuffer(wrappingKey);
+      const privateKey = await window.crypto.subtle.importKey(
+        "pkcs8",
+        privateKeyBuffer,
+        { name: "RSA-OAEP", hash: "SHA-256" },
+        false,
+        ["decrypt"]
+      );
+
+      const wrappedBuffer = base64ToArrayBuffer(wrappedKeyBase64);
+      const decryptedBuffer = await window.crypto.subtle.decrypt(
+        { name: "RSA-OAEP" },
+        privateKey,
+        wrappedBuffer
+      );
+
+      return await window.crypto.subtle.importKey(
+        "raw",
+        decryptedBuffer,
+        { name: "AES-GCM", length: 256 },
+        true,
+        ["encrypt", "decrypt", "wrapKey", "unwrapKey"]
+      );
+    } catch (error) {
+      console.error("RSA unwrapping failed:", error);
+      throw new Error("Failed to unwrap key with RSA private key");
+    }
   }
+  
+  try {
+    const wrappedKeyWithIv = base64ToArrayBuffer(wrappedKeyBase64);
+    const wrappedKeyView = new Uint8Array(wrappedKeyWithIv);
 
-  const wrappedKeyWithIv = base64ToArrayBuffer(wrappedKeyBase64);
-  const wrappedKeyView = new Uint8Array(wrappedKeyWithIv);
+    if (wrappedKeyView.byteLength > 500) {
+      console.log("Unwrapping RSA private key with AES UMK");
+      
+      if (wrappedKeyView.byteLength < 13) {
+        throw new Error("Wrapped private key data too short");
+      }
 
-  if (wrappedKeyView.byteLength < 13) {
-    console.error("Invalid wrapped key length:", wrappedKeyView.byteLength);
-    throw new Error("Wrapped key data too short");
+      const iv = wrappedKeyView.slice(0, 12);
+      const wrappedKey = wrappedKeyView.slice(12);
+
+      const decryptedPrivateKeyBuffer = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: iv },
+        wrappingKey as CryptoKey,
+        wrappedKey
+      );
+
+      return await window.crypto.subtle.importKey(
+        "pkcs8",
+        decryptedPrivateKeyBuffer,
+        { name: "RSA-OAEP", hash: "SHA-256" },
+        true,
+        ["decrypt"]
+      );
+    } else {
+      console.log("Unwrapping AES key with UMK");
+      
+      if (wrappedKeyView.byteLength < 13) {
+        throw new Error("Wrapped AES key data too short");
+      }
+
+      const iv = wrappedKeyView.slice(0, 12);
+      const wrappedKey = wrappedKeyView.slice(12);
+
+      const decryptedKeyBuffer = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: iv },
+        wrappingKey as CryptoKey,
+        wrappedKey
+      );
+
+      return await window.crypto.subtle.importKey(
+        "raw",
+        decryptedKeyBuffer,
+        { name: "AES-GCM", length: 256 },
+        true,
+        ["encrypt", "decrypt", "wrapKey", "unwrapKey"]
+      );
+    }
+  } catch (error) {
+    console.error("AES unwrapping failed:", error);
+    throw new Error("Failed to unwrap key with AES key");
   }
-
-  const iv = wrappedKeyView.slice(0, 12);
-  const wrappedKey = wrappedKeyView.slice(12);
-
-  console.log("unwrapKey iv:", bufferToBase64(iv));
-  console.log("unwrapKey wrappedKey length:", wrappedKey.byteLength);
-
-  const decryptedKeyBuffer = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: iv },
-    wrappingKey as CryptoKey,
-    wrappedKey
-  );
-
-  const unwrappedKey = await crypto.subtle.importKey(
-    "raw",
-    decryptedKeyBuffer,
-    { name: "AES-GCM", length: 256 },
-    true,
-    ["encrypt", "decrypt", "wrapKey", "unwrapKey"]
-  );
-
-  return unwrappedKey;
 };
 
 export const decryptData = async (encryptedDataBase64: string, itemKey: CryptoKey): Promise<string> => {
@@ -233,9 +271,16 @@ export const importRSAPrivateKey = async (privateKeyBase64: string): Promise<Cry
 
 
 export const encryptWithRSA = async (data: string, publicKeyBase64: string): Promise<string> => {
-  const publicKey = await importRSAPublicKey(publicKeyBase64);
-  const dataBuffer = base64ToArrayBuffer(data);
+  const publicKeyBuffer = base64ToArrayBuffer(publicKeyBase64);
+  const publicKey = await window.crypto.subtle.importKey(
+    "spki",
+    publicKeyBuffer,
+    { name: "RSA-OAEP", hash: "SHA-256" },
+    false,
+    ["encrypt"]
+  );
   
+  const dataBuffer = base64ToArrayBuffer(data);
   const encryptedBuffer = await window.crypto.subtle.encrypt(
     { name: "RSA-OAEP" },
     publicKey,

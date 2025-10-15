@@ -13,6 +13,8 @@ import { SidebarTrigger } from '@/components/ui/sidebar';
 import VaultSetting from '@/components/vaults/VaultSetting'
 import { TeamManagement } from '@/components/teams/TeamManagement';
 import { OrganizationManagement } from '@/components/org/OrganizationManagement';
+import { NotificationBadge } from '@/components/notifications/NotificationBadge';
+import { OrgItemsList } from '@/components/vaults/OrgItemsList';
 
 interface AuditLog {
   id: number;
@@ -80,6 +82,10 @@ const DashboardPage = () => {
       case "Manage":
         // @ts-expect-error Todo: Type missmatch
         return <OrganizationManagement user={user} orgId={user.org.id} />
+      case "Active":
+        return <NotificationBadge />
+      case "Org Items":
+      return <OrgItemsList />;
       default:
         return <DashboardOverview recentActivity={recentActivity} />;
     }

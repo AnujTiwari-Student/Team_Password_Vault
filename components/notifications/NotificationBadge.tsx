@@ -35,6 +35,7 @@ export const NotificationBadge: React.FC = () => {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [selectedInvitation, setSelectedInvitation] = useState<Invitation | null>(null);
   const [showModal, setShowModal] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
     fetchInvitations();
@@ -42,12 +43,15 @@ export const NotificationBadge: React.FC = () => {
 
   const fetchInvitations = async (): Promise<void> => {
     try {
-      const response = await axios.get('/api/invitations');
+      setLoading(true);
+      const response = await axios.get('/api/invites');
       if (response.data.success) {
         setInvitations(response.data.data.invitations || []);
       }
     } catch (error) {
       console.error('Failed to fetch invitations:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -57,7 +61,39 @@ export const NotificationBadge: React.FC = () => {
   };
 
   const handleInvitationAccepted = (): void => {
-    fetchInvitations(); // Refresh invitations
+    fetchInvitations();
+  };
+
+  const formatTimeAgo = (dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffDays > 0) {
+      return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    } else if (diffHours > 0) {
+      return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    } else {
+      return 'Just now';
+    }
+  };
+
+  const formatExpiresAt = (dateString: string): string => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = date.getTime() - now.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffDays > 0) {
+      return `Expires in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
+    } else if (diffHours > 0) {
+      return `Expires in ${diffHours} hour${diffHours > 1 ? 's' : ''}`;
+    } else {
+      return 'Expires soon';
+    }
   };
 
   return (
@@ -71,21 +107,30 @@ export const NotificationBadge: React.FC = () => {
                 {invitations.length}
               </span>
             )}
+            {loading && (
+              <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+            )}
           </button>
         </DropdownMenuTrigger>
         
         <DropdownMenuContent 
           align="end" 
-          className="w-80 bg-gray-800 border-gray-700 text-white"
+          className="w-80 bg-gray-800 border-gray-700 text-white max-h-96 overflow-y-auto"
         >
-          {invitations.length === 0 ? (
+          {loading ? (
+            <div className="p-4 text-center text-gray-400">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400 mx-auto mb-2" />
+              <p className="text-sm">Loading invitations...</p>
+            </div>
+          ) : invitations.length === 0 ? (
             <div className="p-4 text-center text-gray-400">
               <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">No notifications</p>
+              <p className="text-xs mt-1">You will see organization invitations here</p>
             </div>
           ) : (
             <>
-              <div className="px-3 py-2 border-b border-gray-700">
+              <div className="px-3 py-2 border-b border-gray-700 bg-gray-700/30">
                 <p className="text-sm font-medium text-gray-300">
                   Organization Invitations ({invitations.length})
                 </p>
@@ -97,7 +142,7 @@ export const NotificationBadge: React.FC = () => {
                   className="p-3 cursor-pointer hover:bg-gray-700 focus:bg-gray-700 border-b border-gray-700/50 last:border-b-0"
                 >
                   <div className="flex items-start gap-3 w-full">
-                    <div className="bg-blue-600 p-1.5 rounded">
+                    <div className="bg-blue-600 p-1.5 rounded flex-shrink-0">
                       <Bell className="w-3 h-3 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -107,9 +152,21 @@ export const NotificationBadge: React.FC = () => {
                       <p className="text-xs text-gray-400">
                         Invited by {invitation.invitedBy.name}
                       </p>
-                      <p className="text-xs text-gray-500">
-                        Role: {invitation.role}
-                      </p>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className={`px-2 py-0.5 text-xs rounded ${
+                          invitation.role === 'owner' 
+                            ? 'bg-yellow-900/30 text-yellow-300'
+                            : invitation.role === 'admin'
+                            ? 'bg-blue-900/30 text-blue-300' 
+                            : 'bg-gray-700/50 text-gray-400'
+                        }`}>
+                          {invitation.role}
+                        </span>
+                        <div className="text-xs text-gray-500 text-right">
+                          <div>{formatTimeAgo(invitation.created_at)}</div>
+                          <div className="text-yellow-400">{formatExpiresAt(invitation.expires_at)}</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </DropdownMenuItem>

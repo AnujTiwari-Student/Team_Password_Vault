@@ -98,3 +98,109 @@ export async function POST(request: NextRequest): Promise<NextResponse<APIRespon
     }, { status: 500 });
   }
 }
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || !session?.user?.email) {
+      return NextResponse.json({
+        success: false,
+        errors: { _form: ["Unauthorized"] }
+      }, { status: 401 });
+    }
+
+    const { searchParams } = request.nextUrl;
+    const orgId = searchParams.get('org_id');
+
+    if (orgId) {
+      const canViewInvites = await prisma.membership.findFirst({
+        where: {
+          user_id: session.user.id,
+          org_id: orgId,
+          role: { in: ['owner', 'admin'] }
+        }
+      });
+
+      if (!canViewInvites) {
+        return NextResponse.json({
+          success: false,
+          errors: { _form: ["Insufficient permissions to view organization invitations"] }
+        }, { status: 403 });
+      }
+
+      const invitations = await prisma.invite.findMany({
+        where: {
+          org_id: orgId,
+          status: 'pending',
+          expires_at: { gt: new Date() }
+        },
+        include: {
+          org: {
+            select: {
+              id: true,
+              name: true,
+              owner_user_id: true
+            }
+          },
+          invitedBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true
+            }
+          }
+        },
+        orderBy: {
+          created_at: 'desc'
+        }
+      });
+
+      return NextResponse.json({
+        success: true,
+        data: { invitations }
+      });
+
+    } else {
+      const invitations = await prisma.invite.findMany({
+        where: {
+          email: session.user.email,
+          status: 'pending',
+          expires_at: { gt: new Date() }
+        },
+        include: {
+          org: {
+            select: {
+              id: true,
+              name: true,
+              owner_user_id: true
+            }
+          },
+          invitedBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true
+            }
+          }
+        },
+        orderBy: {
+          created_at: 'desc'
+        }
+      });
+
+      return NextResponse.json({
+        success: true,
+        data: { invitations }
+      });
+    }
+
+  } catch (error: unknown) {
+    console.error("Get invitations error:", error);
+    return NextResponse.json({
+      success: false,
+      errors: { _form: [error instanceof Error ? error.message : "Internal server error"] }
+    }, { status: 500 });
+  }
+}

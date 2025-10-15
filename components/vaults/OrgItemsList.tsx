@@ -1,20 +1,68 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Search, Filter, Grid, List, Key, Users, User as UserIcon, Lock, Edit } from "lucide-react";
+import { Search, Filter, Grid, List, Key, Users, Building, Lock, Edit } from "lucide-react";
 import { copyToClipboard } from "@/utils/handle-copy";
-import AddingItemsModal from "../modals/AddingItems";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useRouter } from "next/navigation";
 import { EnhancedItemDrawer } from "../drawer/EnhancedItemDrawer";
-import { useItems } from "@/hooks/useItems";
 import { useUserMasterKey } from "@/hooks/useUserMasterKey";
 import { useVaultOVK } from "@/hooks/useVaultOvk";
 import { useDecryption } from "@/hooks/useDecryption";
-import { getUserRoleInVault, canUserDecrypt, canUserEdit } from "@/utils/permission-utils";
+import { canUserDecrypt, canUserEdit } from "@/utils/permission-utils";
 import { APIVaultItem, User, MemberRole } from "@/types/vault";
 
-export const ItemList: React.FC = () => {
+const useOrgItems = (searchTerm: string, typeFilter: string, tagFilter: string) => {
+  const [loading, setLoading] = useState<boolean>(true);
+  const [items, setItems] = useState<APIVaultItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [vaultInfo, setVaultInfo] = useState<{
+    vault_id: string;
+    vault_name: string;
+    user_role: string;
+    org_id: string;
+  } | null>(null);
+
+  const fetchItems = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const params = new URLSearchParams();
+      if (searchTerm) params.append('q', searchTerm);
+      if (typeFilter) params.append('type', typeFilter);
+      if (tagFilter) params.append('tag', tagFilter);
+
+      const response = await fetch(`/api/items/member-items?${params.toString()}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to fetch organization items');
+      }
+
+      setItems(data.items || []);
+      setVaultInfo({
+        vault_id: data.vault_id,
+        vault_name: data.vault_name,
+        user_role: data.user_role,
+        org_id: data.org_id
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchItems();
+  }, [searchTerm, typeFilter, tagFilter]);
+
+  return { loading, items, error, vaultInfo, refetch: fetchItems };
+};
+
+export const OrgItemsList: React.FC = () => {
   const router = useRouter();
   const user = useCurrentUser() as User | null;
 
@@ -29,25 +77,20 @@ export const ItemList: React.FC = () => {
   const [mnemonic, setMnemonic] = useState<string>("");
   const [showPassphraseInput, setShowPassphraseInput] = useState<boolean>(false);
 
-  const userRole: MemberRole | null = getUserRoleInVault(user, user?.vault || null);
+  const userRole: MemberRole | null = user?.member?.role as MemberRole || null;
   const canDecrypt: boolean = canUserDecrypt(userRole);
   const canEdit: boolean = canUserEdit(userRole);
 
   const { umkCryptoKey, privateKeyBase64 } = useUserMasterKey(mnemonic || null);
+  const { loading, items, error, vaultInfo, refetch } = useOrgItems(searchTerm, typeFilter, tagFilter);
+  
   const ovkCryptoKey = useVaultOVK(
     umkCryptoKey,
-    user?.vault?.id || null,
-    user?.vault?.type,
+    vaultInfo?.vault_id || null,
+    'org',
     privateKeyBase64
   );
   const { decryptItem, getDecryptedItem, isDecrypting } = useDecryption(ovkCryptoKey);
-
-  const { loading, items, error, refetch } = useItems(
-    user?.vault?.id || "",
-    searchTerm,
-    typeFilter,
-    tagFilter
-  );
 
   useEffect(() => {
     if (!user) {
@@ -140,24 +183,20 @@ export const ItemList: React.FC = () => {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-4">
           <div className="min-w-0 flex-shrink">
             <div className="flex items-center gap-2 mb-1">
+              <Building className="w-5 h-5 text-blue-400" />
               <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-white truncate">
-                {user?.vault?.name || "My Vault"}
+                Org Items
               </h2>
               <div className={`flex items-center gap-1 px-2 py-1 rounded-lg border ${getRoleBadgeColor(userRole)}`}>
-                {user?.vault?.type === 'personal' ? (
-                  <UserIcon className="w-3 h-3" />
-                ) : (
-                  <Users className="w-3 h-3" />
-                )}
+                <Users className="w-3 h-3" />
                 <span className="text-xs">{userRole || 'Unknown'}</span>
               </div>
             </div>
             <p className="text-gray-400 text-sm mt-1">
-              {loading ? "Loading..." : `${items.length} items`}
+              {loading ? "Loading..." : 
+               error ? "Error loading items" :
+               `${items.length} items${vaultInfo?.vault_name ? ` in ${vaultInfo.vault_name}` : ''}`}
             </p>
-          </div>
-          <div className="flex items-center gap-3 w-full md:w-auto flex-shrink-0">
-            <AddingItemsModal />
           </div>
         </div>
 
@@ -181,9 +220,14 @@ export const ItemList: React.FC = () => {
             />
             <div className="flex items-center gap-2">
               {ovkCryptoKey ? (
-                <div className="flex items-center gap-1 text-gray-400 text-xs">
+                <div className="flex items-center gap-1 text-green-400 text-xs">
                   <span>✓</span>
-                  <span>Decryption key loaded</span>
+                  <span>Decryption key loaded for organization vault</span>
+                </div>
+              ) : mnemonic.trim() ? (
+                <div className="flex items-center gap-1 text-yellow-400 text-xs">
+                  <span>⏳</span>
+                  <span>Loading organization vault key...</span>
                 </div>
               ) : (
                 <p className="text-gray-400 text-xs">
@@ -208,14 +252,14 @@ export const ItemList: React.FC = () => {
               <h3 className="text-gray-300 font-medium text-sm">View-Only Access</h3>
             </div>
             <div className="space-y-2 text-sm text-gray-400">
-              <p>You have {userRole} permissions for this vault. You can:</p>
+              <p>You have {userRole} permissions for this organization vault. You can:</p>
               <ul className="list-disc list-inside space-y-1 ml-4">
                 <li>View item names, URLs, and metadata</li>
                 <li>Copy encrypted values for external decryption</li>
                 {(userRole === 'member' || userRole === 'admin' || userRole === 'owner') && <li>Share items with others</li>}
               </ul>
               <p className="text-xs text-gray-500 mt-2">
-                Decryption requires higher permissions or vault ownership.
+                Decryption requires higher permissions or organization membership.
               </p>
             </div>
           </div>
@@ -229,7 +273,7 @@ export const ItemList: React.FC = () => {
               type="button"
             >
               <Key className="w-4 h-4" />
-              <span>Show passphrase input to decrypt items</span>
+              <span>Show passphrase input to decrypt organization items</span>
             </button>
           </div>
         )}
@@ -239,7 +283,7 @@ export const ItemList: React.FC = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 z-10" />
             <input
               type="text"
-              placeholder="Search items..."
+              placeholder="Search organization items..."
               value={searchTerm}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
               onFocus={() => setIsSearchFocused(true)}
@@ -295,7 +339,7 @@ export const ItemList: React.FC = () => {
 
         {error && (
           <div className="bg-gray-800/20 border border-gray-700/30 rounded-xl p-4 text-gray-300 w-full">
-            <p className="font-semibold">Error loading items:</p>
+            <p className="font-semibold">Error loading organization items:</p>
             <p className="text-sm mt-1 break-words text-gray-400">{error}</p>
             <button
               onClick={refetch}
@@ -310,7 +354,7 @@ export const ItemList: React.FC = () => {
         {loading && (
           <div className="flex items-center justify-center py-8 w-full">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-500"></div>
-            <span className="ml-2 text-gray-400">Loading items...</span>
+            <span className="ml-2 text-gray-400">Loading organization items...</span>
           </div>
         )}
 
@@ -318,8 +362,9 @@ export const ItemList: React.FC = () => {
           <>
             {items.length === 0 ? (
               <div className="text-center py-8 text-gray-400 w-full">
-                <p className="text-lg mb-2">No items found</p>
-                <p className="text-sm">Try adding some items to your vault!</p>
+                <Building className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                <p className="text-lg mb-2">No organization items found</p>
+                <p className="text-sm">Items shared by your organization will appear here.</p>
               </div>
             ) : (
               <div className={`w-full grid gap-3 md:gap-4 ${
@@ -363,7 +408,6 @@ export const ItemList: React.FC = () => {
                           {canEdit && (
                             <Edit
                               className="w-3 h-3 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                              // @ts-expect-error Type 'string | undefined' is not assignable to type 'string'.
                               title="Can edit"
                             />
                           )}
