@@ -115,4 +115,15 @@ export const AddMemberSchema = z.object({
   role: z.enum(["member", "admin", "owner", "viewer"])
 });
 
+export const CreateOrgSchema = z.object({
+  name: z.string().min(2, {
+    message: "Organization name must be at least 2 characters"
+  }).max(50, {
+    message: "Organization name must be less than 50 characters"
+  }),
+  description: z.string().optional(),
+});
+
+export type CreateOrgSchemaType = z.infer<typeof CreateOrgSchema>;
+
 

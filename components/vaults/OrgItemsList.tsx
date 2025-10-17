@@ -77,7 +77,8 @@ export const OrgItemsList: React.FC = () => {
   const [mnemonic, setMnemonic] = useState<string>("");
   const [showPassphraseInput, setShowPassphraseInput] = useState<boolean>(false);
 
-  const userRole: MemberRole | null = user?.member?.role as MemberRole || null;
+  // @ts-expect-error Todo: need to be fixed
+  const userRole: MemberRole | null = user.member.role! as MemberRole | null;
   const canDecrypt: boolean = canUserDecrypt(userRole);
   const canEdit: boolean = canUserEdit(userRole);
 
@@ -408,7 +409,6 @@ export const OrgItemsList: React.FC = () => {
                           {canEdit && (
                             <Edit
                               className="w-3 h-3 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                              title="Can edit"
                             />
                           )}
                         </div>

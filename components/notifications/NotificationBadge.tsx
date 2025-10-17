@@ -1,20 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Bell } from 'lucide-react';
-import axios from 'axios';
-import { AcceptInviteModal } from '../modals/AcceptInviteModal';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import { AcceptInviteModal } from "../modals/AcceptInviteModal";
+import { SquareArrowOutUpRight } from "lucide-react";
 
 interface Invitation {
   id: string;
   org_id: string;
   email: string;
-  role: 'owner' | 'admin' | 'member' | 'viewer';
-  status: 'pending';
+  role: "owner" | "admin" | "member" | "viewer";
+  status: "pending";
   expires_at: string;
   invited_by: string;
   created_at: string;
@@ -33,7 +27,8 @@ interface Invitation {
 
 export const NotificationBadge: React.FC = () => {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
-  const [selectedInvitation, setSelectedInvitation] = useState<Invitation | null>(null);
+  const [selectedInvitation, setSelectedInvitation] =
+    useState<Invitation | null>(null);
   const [showModal, setShowModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -44,12 +39,12 @@ export const NotificationBadge: React.FC = () => {
   const fetchInvitations = async (): Promise<void> => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/invites');
+      const response = await axios.get("/api/invites");
       if (response.data.success) {
         setInvitations(response.data.data.invitations || []);
       }
     } catch (error) {
-      console.error('Failed to fetch invitations:', error);
+      console.error("Failed to fetch invitations:", error);
     } finally {
       setLoading(false);
     }
@@ -72,11 +67,11 @@ export const NotificationBadge: React.FC = () => {
     const diffDays = Math.floor(diffHours / 24);
 
     if (diffDays > 0) {
-      return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+      return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
     } else if (diffHours > 0) {
-      return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+      return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
     } else {
-      return 'Just now';
+      return "Just now";
     }
   };
 
@@ -88,93 +83,150 @@ export const NotificationBadge: React.FC = () => {
     const diffDays = Math.floor(diffHours / 24);
 
     if (diffDays > 0) {
-      return `Expires in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
+      return `Expires in ${diffDays} day${diffDays > 1 ? "s" : ""}`;
     } else if (diffHours > 0) {
-      return `Expires in ${diffHours} hour${diffHours > 1 ? 's' : ''}`;
+      return `Expires in ${diffHours} hour${diffHours > 1 ? "s" : ""}`;
     } else {
-      return 'Expires soon';
+      return "Expires soon";
     }
   };
 
+  if (loading) {
+    return (
+      <div className="w-full max-w-4xl mx-auto p-4">
+        <div className="bg-gray-800 border-gray-700 rounded-lg p-6 text-white">
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div>
+            <span className="ml-3 text-gray-400">Loading invitations...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (invitations.length === 0) {
+    return (
+      <div className="w-full max-w-8xl mx-auto p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold text-white">Notifications</h2>
+        </div>
+        <div className="bg-gray-800 border-gray-700 rounded-lg p-8 text-center text-white">
+          <div className="w-16 h-16 mx-auto mb-4 bg-gray-700 rounded-full flex items-center justify-center">
+            <SquareArrowOutUpRight />
+          </div>
+          <h3 className="text-sm font-medium text-gray-300 mb-2">
+            No notifications
+          </h3>
+          <p className="text-xs text-gray-400">
+            You will see organization invitations here
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="relative p-2 text-gray-400 hover:text-white transition-colors">
-            <Bell className="w-5 h-5" />
-            {invitations.length > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs px-1.5 py-0.5 rounded-full min-w-[18px] h-[18px] flex items-center justify-center">
-                {invitations.length}
-              </span>
-            )}
-            {loading && (
-              <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-            )}
-          </button>
-        </DropdownMenuTrigger>
-        
-        <DropdownMenuContent 
-          align="end" 
-          className="w-80 bg-gray-800 border-gray-700 text-white max-h-96 overflow-y-auto"
-        >
-          {loading ? (
-            <div className="p-4 text-center text-gray-400">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400 mx-auto mb-2" />
-              <p className="text-sm">Loading invitations...</p>
-            </div>
-          ) : invitations.length === 0 ? (
-            <div className="p-4 text-center text-gray-400">
-              <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No notifications</p>
-              <p className="text-xs mt-1">You will see organization invitations here</p>
-            </div>
-          ) : (
-            <>
-              <div className="px-3 py-2 border-b border-gray-700 bg-gray-700/30">
-                <p className="text-sm font-medium text-gray-300">
-                  Organization Invitations ({invitations.length})
-                </p>
-              </div>
-              {invitations.map((invitation) => (
-                <DropdownMenuItem
-                  key={invitation.id}
-                  onClick={() => handleInvitationClick(invitation)}
-                  className="p-3 cursor-pointer hover:bg-gray-700 focus:bg-gray-700 border-b border-gray-700/50 last:border-b-0"
-                >
-                  <div className="flex items-start gap-3 w-full">
+      <div className="w-full max-w-8xl mx-auto p-4 space-y-4">
+
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold text-white">Notifications</h2>
+        </div>
+
+        <div className="bg-gray-800 border-gray-700 rounded-lg px-4 py-3 sm:px-6 border">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium text-gray-300">
+              Organization Invitations ({invitations.length})
+            </h2>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {invitations.map((invitation) => (
+            <div
+              key={invitation.id}
+              onClick={() => handleInvitationClick(invitation)}
+              className="bg-gray-800 border-gray-700 border rounded-lg p-4 sm:p-6 cursor-pointer hover:bg-gray-700 transition-colors"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start gap-3">
                     <div className="bg-blue-600 p-1.5 rounded flex-shrink-0">
-                      <Bell className="w-3 h-3 text-white" />
+                      <svg
+                        className="w-3 h-3 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 17h5l-5 5-5-5h5zm0 0V3"
+                        />
+                      </svg>
                     </div>
+
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">
+                      <h3 className="text-sm font-medium text-white truncate">
                         {invitation.org.name}
-                      </p>
-                      <p className="text-xs text-gray-400">
+                      </h3>
+                      <p className="text-xs text-gray-400 mt-1">
                         Invited by {invitation.invitedBy.name}
                       </p>
-                      <div className="flex items-center justify-between mt-1">
-                        <span className={`px-2 py-0.5 text-xs rounded ${
-                          invitation.role === 'owner' 
-                            ? 'bg-yellow-900/30 text-yellow-300'
-                            : invitation.role === 'admin'
-                            ? 'bg-blue-900/30 text-blue-300' 
-                            : 'bg-gray-700/50 text-gray-400'
-                        }`}>
+
+                      <div className="flex flex-wrap items-center gap-2 mt-2 sm:hidden">
+                        <span
+                          className={`px-2 py-0.5 text-xs rounded ${
+                            invitation.role === "owner"
+                              ? "bg-yellow-900/30 text-yellow-300"
+                              : invitation.role === "admin"
+                              ? "bg-blue-900/30 text-blue-300"
+                              : "bg-gray-700/50 text-gray-400"
+                          }`}
+                        >
                           {invitation.role}
                         </span>
-                        <div className="text-xs text-gray-500 text-right">
-                          <div>{formatTimeAgo(invitation.created_at)}</div>
-                          <div className="text-yellow-400">{formatExpiresAt(invitation.expires_at)}</div>
-                        </div>
+                        <span className="text-xs text-gray-500">
+                          {formatTimeAgo(invitation.created_at)}
+                        </span>
                       </div>
                     </div>
                   </div>
-                </DropdownMenuItem>
-              ))}
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+                </div>
+
+                <div className="hidden sm:flex sm:flex-col sm:items-end sm:gap-2">
+                  <span
+                    className={`px-2 py-0.5 text-xs rounded ${
+                      invitation.role === "owner"
+                        ? "bg-yellow-900/30 text-yellow-300"
+                        : invitation.role === "admin"
+                        ? "bg-blue-900/30 text-blue-300"
+                        : "bg-gray-700/50 text-gray-400"
+                    }`}
+                  >
+                    {invitation.role}
+                  </span>
+                  <div className="text-right">
+                    <div className="text-xs text-gray-500">
+                      {formatTimeAgo(invitation.created_at)}
+                    </div>
+                    <div className="text-xs text-yellow-400">
+                      {formatExpiresAt(invitation.expires_at)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-3 sm:hidden">
+                <div className="text-xs text-yellow-400">
+                  {formatExpiresAt(invitation.expires_at)}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       <AcceptInviteModal
         isOpen={showModal}
