@@ -17,9 +17,9 @@ export default auth(async function middleware(req) {
     return NextResponse.redirect(new URL(redirectUrl, req.url));
   }
 
-  if( isLoggedIn && (url.pathname === "/auth/login" || url.pathname === "/")) {
-    return NextResponse.redirect(new URL(homeUrl, req.url));
-  }
+  // if( isLoggedIn && (url.pathname === "/auth/login" || url.pathname === "/")) {
+  //   return NextResponse.redirect(new URL(homeUrl, req.url));
+  // }
 
   let role = "owner";
   if (url.pathname.startsWith("/auth/login")) role = "owner";

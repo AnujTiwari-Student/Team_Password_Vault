@@ -67,6 +67,8 @@ model User {
   umk_salt                   String?
   master_passphrase_verifier String?
   twofa_enabled              Boolean      @default(false)
+  totp_secret                String?
+  backup_codes               String[]
   public_key                 String?
   created_at                 DateTime     @default(now())
   last_login                 DateTime?

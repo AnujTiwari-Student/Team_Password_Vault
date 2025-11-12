@@ -22,7 +22,7 @@ export const CustomOAuthAdapter = (db: PrismaClient) => {
           auth_provider: AuthProvider.oauth,
           umk_salt: user.umk_salt ?? undefined,
           master_passphrase_verifier: user.master_passphrase_verifier ?? undefined,
-          twofa_enabled: true,
+          twofa_enabled: false,
           public_key: user.public_key ?? undefined,
           last_login: user.last_login ?? undefined,
           auth_hash: undefined,
@@ -52,6 +52,58 @@ export const CustomOAuthAdapter = (db: PrismaClient) => {
         console.error(`Error creating user via OAuth for ${user.email}:`, error);
         throw error;
       }
+    },
+
+    async getUser(id: string) {
+      const user = await db.user.findUnique({
+        where: { id }
+      });
+
+      if (!user) return null;
+
+      return {
+        _id: user.id,
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        image: user.image,
+        emailVerified: user.email_verified ?? null,
+        auth_hash: user.auth_hash ?? null,
+        auth_provider: user.auth_provider,
+        umk_salt: user.umk_salt ?? null,
+        master_passphrase_verifier: user.master_passphrase_verifier ?? null,
+        twofa_enabled: user.twofa_enabled,
+        public_key: user.public_key ?? null,
+        last_login: user.last_login ?? null,
+        masterPassphraseSetupComplete: !!user.master_passphrase_verifier,
+        account_type: user.account_type,
+      } as ExtendedAdapterUser;
+    },
+
+    async getUserByEmail(email: string) {
+      const user = await db.user.findUnique({
+        where: { email }
+      });
+
+      if (!user) return null;
+
+      return {
+        _id: user.id,
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        image: user.image,
+        emailVerified: user.email_verified ?? null,
+        auth_hash: user.auth_hash ?? null,
+        auth_provider: user.auth_provider,
+        umk_salt: user.umk_salt ?? null,
+        master_passphrase_verifier: user.master_passphrase_verifier ?? null,
+        twofa_enabled: user.twofa_enabled,
+        public_key: user.public_key ?? null,
+        last_login: user.last_login ?? null,
+        masterPassphraseSetupComplete: !!user.master_passphrase_verifier,
+        account_type: user.account_type,
+      } as ExtendedAdapterUser;
     },
   };
 };

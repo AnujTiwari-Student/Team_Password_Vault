@@ -636,7 +636,7 @@ function ItemCreationForm() {
           className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed h-10 sm:h-11 text-sm sm:text-base"
           disabled={isPending || !ovkCryptoKey || selectedTypes.length === 0}
         >
-          {isPending ? "Creating..." : "Create Vault Item"}
+          {isPending ? "Creating..." : "Add Item"}
         </Button>
       </div>
     </div>

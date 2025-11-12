@@ -28,23 +28,26 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import CreateOrgForm from "../auth/CreateOrgForm";
 
 interface Organization {
   id: string;
   name: string;
-  plan: string;
   role: 'owner' | 'admin' | 'member' | 'viewer';
   created_at: string;
   isOwner: boolean;
+  vault?: {
+    id: string;
+    name: string;
+    type: string;
+  };
 }
 
 const dummyOrgs: Organization[] = [
   {
     id: "1",
     name: "Acme Corp",
-    plan: "Free",
     role: "owner",
     created_at: "2024-01-15T00:00:00Z",
     isOwner: true,
@@ -52,7 +55,6 @@ const dummyOrgs: Organization[] = [
   {
     id: "2", 
     name: "Tech Startup Inc",
-    plan: "Free",
     role: "admin",
     created_at: "2024-02-20T00:00:00Z",
     isOwner: false,
@@ -60,7 +62,6 @@ const dummyOrgs: Organization[] = [
   {
     id: "3",
     name: "Design Agency",
-    plan: "Free",
     role: "member",
     created_at: "2024-03-10T00:00:00Z",
     isOwner: false,
@@ -69,6 +70,7 @@ const dummyOrgs: Organization[] = [
 
 export function TeamSwitcher() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useCurrentUser();
   const { isMobile } = useSidebar();
 
@@ -77,6 +79,18 @@ export function TeamSwitcher() {
   const [activeOrg, setActiveOrg] = useState<Organization | null>(null);
   const [isLoadingOrgs, setIsLoadingOrgs] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  useEffect(() => {
+    const orgIdFromUrl = searchParams.get('org');
+    if (orgIdFromUrl && organizations.length > 0) {
+      const orgFromUrl = organizations.find(org => org.id === orgIdFromUrl);
+      if (orgFromUrl && orgFromUrl.id !== activeOrg?.id) {
+        setActiveOrg(orgFromUrl);
+      }
+    } else if (!orgIdFromUrl && activeOrg) {
+      setActiveOrg(null);
+    }
+  }, [searchParams, organizations, activeOrg?.id]);
 
   useEffect(() => {
     if (!user) {
@@ -111,16 +125,36 @@ export function TeamSwitcher() {
         const orgs = response.data.data.organizations || [];
         setOrganizations(orgs);
         
-        const currentOrg = orgs.find((org: Organization) => org.id === user?.org?.id) || orgs[0];
-        setActiveOrg(currentOrg || null);
+        if (!activeOrg && !searchParams.get('org')) {
+          const currentOrg = orgs.find((org: Organization) => org.id === user?.org?.id) || orgs[0];
+          if (currentOrg) {
+            setActiveOrg(currentOrg);
+            updateUrlWithOrg(currentOrg.id);
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to fetch organizations:', error);
       setOrganizations(dummyOrgs);
-      setActiveOrg(dummyOrgs[0]);
+      if (!activeOrg) {
+        setActiveOrg(dummyOrgs[0]);
+      }
     } finally {
       setIsLoadingOrgs(false);
     }
+  };
+
+  const updateUrlWithOrg = (orgId: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    
+    if (orgId) {
+      params.set('org', orgId);
+    } else {
+      params.delete('org');
+    }
+    
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    router.push(newUrl, { scroll: false });
   };
 
   const handleCreateOrg = (): void => {
@@ -133,7 +167,33 @@ export function TeamSwitcher() {
 
   const handleOrgSwitch = (org: Organization): void => {
     setActiveOrg(org);
+    updateUrlWithOrg(org.id);
+    
+    // Trigger a custom event for other components to listen to
+    window.dispatchEvent(new CustomEvent('organizationChanged', { 
+      detail: { 
+        organization: org,
+        orgId: org.id,
+        isPersonalWorkspace: false 
+      } 
+    }));
+    
     console.log('Switched to organization:', org.name);
+  };
+
+  const handlePersonalWorkspace = (): void => {
+    setActiveOrg(null);
+    updateUrlWithOrg(null);
+    
+    window.dispatchEvent(new CustomEvent('organizationChanged', { 
+      detail: { 
+        organization: null,
+        orgId: null,
+        isPersonalWorkspace: true 
+      } 
+    }));
+    
+    console.log('Switched to personal workspace');
   };
 
   if (!user) {
@@ -149,7 +209,8 @@ export function TeamSwitcher() {
 
   const hasOrganizations = organizations.length > 0;
   const displayName = activeOrg?.name ? `${activeOrg.name}` : `${user.name} (Personal Workspace)`;
-  const displayPlan = activeOrg?.plan || 'Free Plan';
+  const displayPlan = 'Free Plan'; // You can make this dynamic based on org plan
+  const isPersonalWorkspace = activeOrg === null;
 
   return (
     <>
@@ -162,10 +223,10 @@ export function TeamSwitcher() {
                 className={`
                   transition-colors duration-150 ease-in-out
                   data-[state=open]:bg-gray-800 data-[state=open]:text-white hover:bg-gray-800
-                  ${!hasOrganizations ? 'hover:bg-transparent data-[state=open]:bg-transparent' : "data-[state=open]:bg-transparent"}
+                  ${!hasOrganizations && isPersonalWorkspace ? 'hover:bg-transparent data-[state=open]:bg-transparent' : "data-[state=open]:bg-transparent"}
                 `}
               >
-                <div className="bg-blue-600 text-white flex aspect-square size-8 items-center justify-center rounded-lg">
+                <div className={`${activeOrg ? 'bg-blue-600' : 'bg-gray-600'} text-white flex aspect-square size-8 items-center justify-center rounded-lg`}>
                   <Building2 className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
@@ -173,7 +234,7 @@ export function TeamSwitcher() {
                     {displayName}
                   </span>
                   <span className="truncate text-xs text-gray-400">
-                    {displayPlan}
+                    {activeOrg ? `${activeOrg.role} • ${displayPlan}` : displayPlan}
                   </span>
                 </div>
                 {isLoadingOrgs ? (
@@ -181,61 +242,66 @@ export function TeamSwitcher() {
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
                   </div>
                 ) : (
-                  <ChevronsUpDown className={`ml-auto text-gray-400 ${hasOrganizations ? "block" : "hidden"}`} />
+                  <ChevronsUpDown className={`ml-auto text-gray-400 ${hasOrganizations || !isPersonalWorkspace ? "block" : "hidden"}`} />
                 )}
               </SidebarMenuButton>
             </DropdownMenuTrigger>
             
-            {hasOrganizations && (
-              <DropdownMenuContent
-                className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-56 rounded-lg bg-gray-800 border border-gray-700 text-white"
-                align="start"
-                side={isMobile ? "bottom" : "right"}
-                sideOffset={4}
+            <DropdownMenuContent
+              className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-56 rounded-lg bg-gray-800 border border-gray-700 text-white"
+              align="start"
+              side={isMobile ? "bottom" : "right"}
+              sideOffset={4}
+            >
+              <DropdownMenuLabel className="text-gray-400 text-xs">Workspaces</DropdownMenuLabel>
+              
+              <DropdownMenuItem
+                onClick={handlePersonalWorkspace}
+                className={`gap-2 p-2 text-white hover:bg-gray-700 focus:bg-gray-700 ${isPersonalWorkspace ? 'bg-gray-700/50' : ''}`}
               >
-                <DropdownMenuLabel className="text-gray-400 text-xs">Organizations</DropdownMenuLabel>
-                
+                <div className={`flex size-6 items-center justify-center rounded-md border border-gray-600 ${isPersonalWorkspace ? 'bg-gray-600' : 'bg-gray-900'}`}>
+                  <Building2 className="size-3.5 shrink-0" />
+                </div>
+                <div className="text-white hover:text-white font-medium">Personal Workspace</div>
+                <DropdownMenuShortcut className="text-gray-400">⌘1</DropdownMenuShortcut>
+              </DropdownMenuItem>
+
+              {hasOrganizations && (
+                <>
+                  <DropdownMenuSeparator className="bg-gray-700" />
+                  <DropdownMenuLabel className="text-gray-400 text-xs">Organizations</DropdownMenuLabel>
+                </>
+              )}
+
+              {organizations.map((org, index) => (
                 <DropdownMenuItem
-                  onClick={() => setActiveOrg(null)}
-                  className="gap-2 p-2 text-white hover:bg-gray-700 focus:bg-gray-700"
+                  key={org.id}
+                  onClick={() => handleOrgSwitch(org)}
+                  className={`gap-2 p-2 text-white hover:bg-gray-700 focus:bg-gray-700 ${activeOrg?.id === org.id ? 'bg-gray-700/50' : ''}`}
                 >
-                  <div className="flex size-6 items-center justify-center rounded-md border border-gray-600 bg-gray-900">
+                  <div className={`flex size-6 items-center justify-center rounded-md border border-gray-600 ${activeOrg?.id === org.id ? 'bg-blue-600' : 'bg-gray-900'}`}>
                     <Building2 className="size-3.5 shrink-0" />
                   </div>
-                  <div className="text-white hover:text-white font-medium">Personal Workspace</div>
-                  <DropdownMenuShortcut className="text-gray-400">⌘1</DropdownMenuShortcut>
-                </DropdownMenuItem>
-
-                {organizations.map((org, index) => (
-                  <DropdownMenuItem
-                    key={org.id}
-                    onClick={() => handleOrgSwitch(org)}
-                    className="gap-2 p-2 text-white hover:bg-gray-700 focus:bg-gray-700"
-                  >
-                    <div className="flex size-6 items-center justify-center rounded-md border border-gray-600 bg-gray-900">
-                      <Building2 className="size-3.5 shrink-0" />
-                    </div>
-                    <div className="flex flex-col flex-1">
-                      <div className="text-white hover:text-white font-medium">{org.name}</div>
-                      <div className="text-xs text-gray-400">{org.role} • {org.plan}</div>
-                    </div>
-                    <DropdownMenuShortcut className="text-gray-400">⌘{index + 2}</DropdownMenuShortcut>
-                  </DropdownMenuItem>
-                ))}
-                
-                <DropdownMenuSeparator className="bg-gray-700" />
-                
-                <DropdownMenuItem 
-                  onClick={handleCreateOrg}
-                  className="gap-2 p-2 text-white hover:bg-gray-700 focus:bg-gray-700"
-                >
-                  <div className="flex size-6 items-center justify-center rounded-md border border-gray-600 bg-transparent">
-                    <Plus className="size-4" />
+                  <div className="flex flex-col flex-1">
+                    <div className="text-white hover:text-white font-medium">{org.name}</div>
+                    <div className="text-xs text-gray-400">{org.role}</div>
                   </div>
-                  <div className="text-gray-400 font-medium">Create organization</div>
+                  <DropdownMenuShortcut className="text-gray-400">⌘{index + 2}</DropdownMenuShortcut>
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            )}
+              ))}
+              
+              <DropdownMenuSeparator className="bg-gray-700" />
+              
+              <DropdownMenuItem 
+                onClick={handleCreateOrg}
+                className="gap-2 p-2 text-white hover:bg-gray-700 focus:bg-gray-700"
+              >
+                <div className="flex size-6 items-center justify-center rounded-md border border-gray-600 bg-transparent">
+                  <Plus className="size-4" />
+                </div>
+                <div className="text-gray-400 font-medium">Create organization</div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
           </DropdownMenu>
         </SidebarMenuItem>
       </SidebarMenu>
@@ -245,7 +311,7 @@ export function TeamSwitcher() {
           <DialogHeader>
             <DialogTitle className="text-white">Create Organization</DialogTitle>
             <DialogDescription className="text-gray-400">
-              Create a new organization to collaborate with your team.
+              Create a new organization with its own vault to collaborate with your team.
             </DialogDescription>
           </DialogHeader>
           <div className="mt-4">

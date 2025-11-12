@@ -1,6 +1,5 @@
 import { LoginSchema } from "@/schema/zod-schema";
 import { zodResolver } from "@hookform/resolvers/zod";
-// import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import React from "react";
 import { useForm } from "react-hook-form";
@@ -19,7 +18,6 @@ import { useSession } from "next-auth/react";
 type AuthFormValues = z.infer<typeof LoginSchema>;
 
 function LoginForm({error: propError}: {error?: string | null}) {
-
     const router = useRouter();
     const { update } = useSession();
     
@@ -47,20 +45,23 @@ function LoginForm({error: propError}: {error?: string | null}) {
                 const res = await login(data);
 
                 if (res.success) {
-                    setSuccess(res.message || "Login successful!");
-                    toast.success(res.message || "Login successful!");
-
-                    await update();
-
-                    router.push("/dashboard");
+                    if (res.requires2FA === true) {
+                        router.push(`/verify-2fa?email=${encodeURIComponent(data.email)}`);
+                        toast.success("2FA code sent to your email");
+                    } else {
+                        setSuccess(res.message || "Login successful!");
+                        toast.success(res.message || "Login successful!");
+                        await update();
+                        router.push("/dashboard");
+                    }
                 } else {
-                    setError(res.errors?._form?.[0] || "Login failed. Please try again.");
+                    setError(res.errors?._form?.[0] || res.errors?.email?.[0] || res.errors?.password?.[0] || "Login failed. Please try again.");
                 }
 
                 setIsLoading(false);
             })
         } catch (error) {
-            console.error("Registration error:", error);
+            console.error("Login error:", error);
             setError("An unexpected error occurred. Please try again.");
             setIsLoading(false);
         }
@@ -82,6 +83,7 @@ function LoginForm({error: propError}: {error?: string | null}) {
                                             {...field}
                                             type="email"
                                             className="text-white"
+                                            disabled={isPending}
                                         />
                                     </FormControl>
                                     <FormMessage />
@@ -95,7 +97,9 @@ function LoginForm({error: propError}: {error?: string | null}) {
                                 <FormItem>
                                     <div className='flex items-center justify-between'>
                                         <FormLabel className='text-[#bfbfbf]'>Password</FormLabel>
-                                        <span className='text-[13px] font-[600] text-blue-400 hover:underline cursor-pointer'><Link href="/forgot-password">Forgot Password?</Link></span>
+                                        <span className='text-[13px] font-[600] text-blue-400 hover:underline cursor-pointer'>
+                                            <Link href="/forgot-password">Forgot Password?</Link>
+                                        </span>
                                     </div>
                                     <FormControl>
                                         <div className="relative">
@@ -103,6 +107,7 @@ function LoginForm({error: propError}: {error?: string | null}) {
                                                 {...field}
                                                 type={showPassword ? 'text' : 'password'}
                                                 className="pr-10 text-white"
+                                                disabled={isPending}
                                             />
                                             <div
                                                 onClick={() => setShowPassword(!showPassword)}
@@ -124,6 +129,7 @@ function LoginForm({error: propError}: {error?: string | null}) {
                         size="lg"
                         className={`w-full flex items-center justify-center gap-2 ${!isPending ? 'text-black' : 'text-[#bfbfbf]'}`}
                         variant="outline"
+                        disabled={isPending || isLoading}
                     >
                         {isPending || isLoading ? 'Logging in...' : 'Login'}
                     </Button>

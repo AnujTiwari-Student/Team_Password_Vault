@@ -71,7 +71,7 @@ const DashboardPage = () => {
       case 'Items':
         return <ItemList />;
       case 'Audits':
-        return <AuditLogsTable auditLogs={auditLogs} />;
+        return <AuditLogsTable />;
       case 'Security':
         return <SecurityCenter />;
       case 'Settings':

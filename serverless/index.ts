@@ -1,6 +1,6 @@
 import { Redis } from '@upstash/redis'
 
 export const redis = new Redis({
-  url: 'https://ideal-maggot-6941.upstash.io',
-  token: 'ARsdAAImcDJkMmNmNTJkYTgzNDc0ZTgwOGMyZjFhNjMwZDRiYzA2OHAyNjk0MQ',
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
 })

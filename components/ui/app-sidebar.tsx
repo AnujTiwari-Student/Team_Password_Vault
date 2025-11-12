@@ -34,18 +34,22 @@ export function AppSidebar({
   const user = useCurrentUser();
 
   const isOrganizationMember = React.useMemo(() => {
-    if (!user!.member) return false;
+    if (!user?.member) return false;
 
-    const memberships = Array.isArray(user!.member) ? user!.member : [user!.member];
+    const memberships = Array.isArray(user.member) ? user.member : [user.member];
     
     const hasNonOwnerMembership = memberships.some(membership => {
-      return membership.role !== 'owner' && membership.org_id !== user!.org?.id;
+      return membership.role !== 'owner' && membership.org_id !== user.org?.id;
     });
 
-    const isPersonalUser = user!.account_type === 'personal';
+    const isPersonalUser = user.account_type === 'personal';
     
     return hasNonOwnerMembership || (isPersonalUser && memberships.length > 0);
   }, [user]);
+
+  const isOrgAccount = React.useMemo(() => {
+    return user?.account_type === 'org';
+  }, [user?.account_type]);
 
   if (!user) {
     return null;
@@ -99,7 +103,8 @@ export function AppSidebar({
           }] : []),
         ],
       },
-      {
+      // Only show Teams section for organization accounts
+      ...(isOrgAccount ? [{
         title: "Teams",
         url: "#",
         icon: Building,
@@ -113,7 +118,7 @@ export function AppSidebar({
             url: "#",
           },
         ],
-      },
+      }] : []),
       {
         title: "Notifications",
         url: "#",

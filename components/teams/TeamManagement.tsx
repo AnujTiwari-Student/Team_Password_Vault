@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Users, Plus, UserPlus, AlertCircle } from "lucide-react";
+import { Users, Plus, UserPlus, AlertCircle, UserX } from "lucide-react";
 import axios from "axios";
 import { Vault, User } from "@/types/vault";
 import { Team } from "@/types/team";
@@ -10,8 +10,8 @@ import { TeamCard } from "./TeamCard";
 import Image from "next/image";
 
 interface TeamManagementProps {
-  vault: Vault;
-  user: User;
+  vault: Vault | null | undefined;
+  user: User | null | undefined;
 }
 
 interface OrganizationMember {
@@ -37,25 +37,32 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [orgMembers, setOrgMembers] = useState<OrganizationMember[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [membersLoading, setMembersLoading] = useState<boolean>(true);
   const [showCreateTeam, setShowCreateTeam] = useState<boolean>(false);
   const [showAddMember, setShowAddMember] = useState<boolean>(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [membersError, setMembersError] = useState<string | null>(null);
 
+  // Safe property access with null checks
   const hasValidVault = vault && vault.id;
   const hasValidOrg = vault?.org_id && user?.org?.id;
   const isOrgVault = vault?.type === "org";
+  const orgId = user?.org?.id;
+  const vaultId = vault?.id;
+  const vaultOrgId = vault?.org_id;
 
   useEffect(() => {
-    if (hasValidVault && hasValidOrg) {
+    if (hasValidVault && hasValidOrg && vaultId && vaultOrgId) {
       fetchTeams();
       fetchOrgMembers();
     } else {
       setLoading(false);
+      setMembersLoading(false);
     }
-  }, [vault?.id, vault?.org_id, user?.org?.id]);
+  }, [hasValidVault, hasValidOrg, vaultId, vaultOrgId, orgId]);
 
   const fetchTeams = async (): Promise<void> => {
-    if (!vault?.org_id || !vault?.id) {
+    if (!vaultOrgId || !vaultId) {
       setLoading(false);
       return;
     }
@@ -63,13 +70,14 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
     try {
       setFetchError(null);
       const response = await axios.get<APIResponse>(
-        `/api/teams?org_id=${vault.org_id}&vault_id=${vault.id}`
+        `/api/teams?org_id=${vaultOrgId}&vault_id=${vaultId}`
       );
 
       if (response.data.success) {
-        setTeams(response.data.data?.teams || []);
-        if (response.data.data?.teams?.length > 0) {
-          setSelectedTeam(response.data.data.teams[0]);
+        const teamsData = response.data.data?.teams || [];
+        setTeams(teamsData);
+        if (teamsData.length > 0) {
+          setSelectedTeam(teamsData[0]);
         }
       } else {
         setFetchError(
@@ -81,13 +89,17 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 404) {
           setTeams([]);
+          setFetchError(null);
         } else {
           setFetchError(
-            error.response?.data?.errors?._form?.[0] || error.message
+            error.response?.data?.errors?._form?.[0] || 
+            error.response?.data?.message ||
+            error.message ||
+            "Failed to fetch teams"
           );
         }
       } else {
-        setFetchError("Failed to fetch teams");
+        setFetchError("An unexpected error occurred while fetching teams");
       }
     } finally {
       setLoading(false);
@@ -95,17 +107,50 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
   };
 
   const fetchOrgMembers = async (): Promise<void> => {
-    if (!user?.org?.id) return;
+    if (!orgId) {
+      setMembersLoading(false);
+      return;
+    }
 
     try {
+      setMembersError(null);
+      setMembersLoading(true);
+
       const response = await axios.get<APIResponse>(
-        `/api/members?org_id=${user.org.id}`
+        `/api/members?org_id=${orgId}`
       );
+
       if (response.data.success && response.data.data) {
-        setOrgMembers(response.data.data.members || []);
+        const membersData = response.data.data.members || [];
+        setOrgMembers(membersData);
+      } else {
+        setMembersError(
+          response.data.errors?._form?.[0] || 
+          "Failed to fetch organization members"
+        );
+        setOrgMembers([]);
       }
     } catch (error) {
       console.error("Failed to fetch organization members:", error);
+      
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 404) {
+          setOrgMembers([]);
+          setMembersError(null);
+        } else {
+          setMembersError(
+            error.response?.data?.errors?._form?.[0] || 
+            error.response?.data?.message ||
+            error.message ||
+            "Failed to fetch organization members"
+          );
+        }
+      } else {
+        setMembersError("An unexpected error occurred while fetching members");
+      }
+      setOrgMembers([]);
+    } finally {
+      setMembersLoading(false);
     }
   };
 
@@ -119,6 +164,50 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
     fetchOrgMembers();
     setShowAddMember(false);
   };
+
+  const retryFetchTeams = () => {
+    setFetchError(null);
+    setLoading(true);
+    fetchTeams();
+  };
+
+  const retryFetchMembers = () => {
+    setMembersError(null);
+    fetchOrgMembers();
+  };
+
+  // Early returns with proper error handling
+  if (!vault) {
+    return (
+      <div className="bg-gray-800/30 rounded-xl p-4 md:p-6 border border-gray-700/30">
+        <div className="flex items-center gap-3 text-gray-400">
+          <AlertCircle className="w-5 h-5 text-red-400" />
+          <div>
+            <p className="text-red-300 font-medium">Invalid Vault</p>
+            <p className="text-sm mt-1">
+              Vault information is missing or invalid
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="bg-gray-800/30 rounded-xl p-4 md:p-6 border border-gray-700/30">
+        <div className="flex items-center gap-3 text-gray-400">
+          <AlertCircle className="w-5 h-5 text-red-400" />
+          <div>
+            <p className="text-red-300 font-medium">User Not Found</p>
+            <p className="text-sm mt-1">
+              User information is missing or invalid
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!hasValidVault || !isOrgVault) {
     return (
@@ -167,35 +256,12 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
     );
   }
 
-  // if (fetchError) {
-  //   return (
-  //     <div className="bg-gray-800/30 rounded-xl p-4 md:p-6 border border-gray-700/30">
-  //       <div className="flex items-center gap-3 text-gray-400">
-  //         <AlertCircle className="w-5 h-5 text-red-400" />
-  //         <div>
-  //           <p className="text-red-300 font-medium">Error Loading Teams</p>
-  //           <p className="text-sm mt-1">{fetchError}</p>
-  //           <button
-  //             onClick={() => {
-  //               setFetchError(null);
-  //               setLoading(true);
-  //               fetchTeams();
-  //             }}
-  //             className="mt-2 px-3 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-300 rounded text-sm transition-colors"
-  //           >
-  //             Try Again
-  //           </button>
-  //         </div>
-  //       </div>
-  //     </div>
-  //   );
-  // }
-
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-white">Teams</h2>
       </div>
+
       <div className="bg-gray-800/30 rounded-xl p-4 md:p-6 border border-gray-700/30">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
           <div>
@@ -225,15 +291,38 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
           </div>
         </div>
 
-        {teams.length === 0 ? (
-          <div className="text-center py-6 text-gray-400">
-            <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm md:text-base">
-              No teams created for this vault yet
+        {fetchError ? (
+          <div className="bg-red-900/20 border border-red-700/30 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-red-400" />
+              <div className="flex-1">
+                <p className="text-red-300 font-medium">Error Loading Teams</p>
+                <p className="text-sm text-red-400 mt-1">{fetchError}</p>
+              </div>
+              <button
+                onClick={retryFetchTeams}
+                className="px-3 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-300 rounded text-sm transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        ) : teams.length === 0 ? (
+          <div className="text-center py-8 text-gray-400">
+            <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p className="text-base md:text-lg font-medium mb-2">
+              No teams created yet
             </p>
-            <p className="text-xs md:text-sm mt-1">
-              Create a team to organize vault access
+            <p className="text-xs md:text-sm text-gray-500 mb-4">
+              Create your first team to organize vault access and collaboration
             </p>
+            <button
+              onClick={() => setShowCreateTeam(true)}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors inline-flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Create Your First Team
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
@@ -250,23 +339,79 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
       </div>
 
       <div className="bg-gray-800/30 rounded-xl p-4 md:p-6 border border-gray-700/30">
-        <h4 className="text-lg md:text-xl font-semibold text-white mb-4">
-          Organization Members ({orgMembers.length})
-        </h4>
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-lg md:text-xl font-semibold text-white">
+            Organization Members
+            {!membersLoading && !membersError && (
+              <span className="text-gray-400 font-normal ml-2">
+                ({orgMembers.length})
+              </span>
+            )}
+          </h4>
+          {!membersLoading && !membersError && orgMembers.length > 0 && (
+            <button
+              onClick={retryFetchMembers}
+              className="text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              Refresh
+            </button>
+          )}
+        </div>
 
-        {orgMembers.length === 0 ? (
-          <div className="text-center py-4 text-gray-400">
-            <p className="text-sm">No members in this organization yet</p>
-            <p className="text-xs mt-1">
-              Invite members to start collaborating
+        {membersLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="animate-pulse">
+                <div className="flex items-center gap-3 p-3 bg-gray-700/20 rounded-lg">
+                  <div className="w-8 h-8 bg-gray-600/50 rounded-full"></div>
+                  <div className="flex-1 space-y-1">
+                    <div className="h-4 bg-gray-600/50 rounded w-1/3"></div>
+                    <div className="h-3 bg-gray-600/30 rounded w-1/2"></div>
+                  </div>
+                  <div className="w-16 h-6 bg-gray-600/50 rounded"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : membersError ? (
+          <div className="bg-red-900/20 border border-red-700/30 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-red-400" />
+              <div className="flex-1">
+                <p className="text-red-300 font-medium">Error Loading Members</p>
+                <p className="text-sm text-red-400 mt-1">{membersError}</p>
+              </div>
+              <button
+                onClick={retryFetchMembers}
+                className="px-3 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-300 rounded text-sm transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        ) : orgMembers.length === 0 ? (
+          <div className="text-center py-8 text-gray-400">
+            <UserX className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p className="text-base md:text-lg font-medium mb-2">
+              No members in organization
             </p>
+            <p className="text-xs md:text-sm text-gray-500 mb-4">
+              Start building your team by inviting members to collaborate
+            </p>
+            <button
+              onClick={() => setShowAddMember(true)}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors inline-flex items-center gap-2"
+            >
+              <UserPlus className="w-4 h-4" />
+              Invite Your First Member
+            </button>
           </div>
         ) : (
           <div className="space-y-2">
             {orgMembers.map((member) => (
               <div
                 key={member.id}
-                className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg"
+                className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg hover:bg-gray-700/40 transition-colors"
               >
                 <div className="flex items-center gap-3">
                   {member.user?.image ? (
@@ -293,11 +438,13 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <span
-                    className={`px-2 py-1 text-xs rounded ${
+                    className={`px-2 py-1 text-xs rounded font-medium ${
                       member.role === "owner"
                         ? "bg-yellow-900/30 text-yellow-300 border-yellow-700/30 border"
                         : member.role === "admin"
                         ? "bg-blue-900/30 text-blue-300 border-blue-700/30 border"
+                        : member.role === "member"
+                        ? "bg-green-900/30 text-green-300 border-green-700/30 border"
                         : "bg-gray-700/50 text-gray-400"
                     }`}
                   >
@@ -310,20 +457,24 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
         )}
       </div>
 
-      <CreateTeamModal
-        isOpen={showCreateTeam}
-        onClose={() => setShowCreateTeam(false)}
-        onTeamCreated={handleTeamCreated}
-        orgId={vault.org_id!}
-        vaultId={vault.id}
-      />
+      {vaultOrgId && vaultId && (
+        <CreateTeamModal
+          isOpen={showCreateTeam}
+          onClose={() => setShowCreateTeam(false)}
+          onTeamCreated={handleTeamCreated}
+          orgId={vaultOrgId}
+          vaultId={vaultId}
+        />
+      )}
 
-      <AddMemberModal
-        isOpen={showAddMember}
-        onClose={() => setShowAddMember(false)}
-        onMemberAdded={handleMemberAdded}
-        orgId={user.org!.id}
-      />
+      {orgId && (
+        <AddMemberModal
+          isOpen={showAddMember}
+          onClose={() => setShowAddMember(false)}
+          onMemberAdded={handleMemberAdded}
+          orgId={orgId}
+        />
+      )}
     </div>
   );
 };
