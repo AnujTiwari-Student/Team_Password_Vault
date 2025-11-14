@@ -1,11 +1,15 @@
 import { prisma } from '@/db';
 import { ErrorCodes } from '@/lib/types/api-response';
 import { AppError } from '@/lib/error-handler';
-import type { User } from '@prisma/client';
+import type { User, Org } from '@prisma/client';
 
 interface StoreTOTPData {
   totp_secret: string;
   backup_codes: string[];
+}
+
+export interface UserWithOrgs extends User {
+  orgs?: Org[];
 }
 
 export async function storeTOTPSecret(
@@ -85,7 +89,7 @@ export async function checkTOTPConfigured(userId: string): Promise<boolean> {
   }
 }
 
-export async function getUserWithOrgs(userId: string): Promise<User | null> {
+export async function getUserWithOrgs(userId: string): Promise<UserWithOrgs | null> {
   try {
     const user = await prisma.user.findUnique({
       where: { id: userId },
