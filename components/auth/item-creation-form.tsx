@@ -29,6 +29,8 @@ import {
   FileText,
   ExternalLink,
   User,
+  RefreshCw,
+  Smartphone,
 } from "lucide-react";
 import {
   generateRandomBytes,
@@ -38,6 +40,8 @@ import {
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useUserMasterKey } from "@/hooks/useUserMasterKey";
 import { useVaultOVK } from "@/hooks/useVaultOvk";
+import { generateVaultItemTOTP, regenerateQRCode } from "@/actions/totp-vault-item";
+import QRCode from "react-qr-code";
 
 interface ItemTypeConfig {
   label: string;
@@ -77,6 +81,11 @@ function ItemCreationForm() {
   const [tagInput, setTagInput] = useState<string>("");
   const [selectedTypes, setSelectedTypes] = useState<ItemTypeEnum[]>([]);
   const [tags, setTags] = useState<string[]>([]);
+  const [totpSecret, setTotpSecret] = useState<string>("");
+  const [totpOtpAuthUrl, setTotpOtpAuthUrl] = useState<string>("");
+  const [totpQrUrl, setTotpQrUrl] = useState<string>("");
+  const [isGeneratingTOTP, setIsGeneratingTOTP] = useState(false);
+  const [isRegeneratingQR, setIsRegeneratingQR] = useState(false);
 
   const { umkCryptoKey, privateKeyBase64 } = useUserMasterKey(mnemonic || null);
   const ovkCryptoKey = useVaultOVK(
@@ -108,16 +117,73 @@ function ItemCreationForm() {
     },
   });
 
+  const generateNewTOTP = useCallback(async () => {
+    if (!user?.email) {
+      setError("User email not found");
+      return;
+    }
+
+    setIsGeneratingTOTP(true);
+    setError(null);
+
+    try {
+      const totpData = await generateVaultItemTOTP(user.email);
+      
+      setTotpSecret(totpData.secret);
+      setTotpOtpAuthUrl(totpData.otpAuthUrl);
+      setTotpQrUrl(totpData.qrCodeUrl);
+      
+      form.setValue("totp_seed_ct", totpData.secret);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to generate TOTP";
+      setError(errorMessage);
+    } finally {
+      setIsGeneratingTOTP(false);
+    }
+  }, [user?.email, form]);
+
+  const handleRegenerateQR = useCallback(async () => {
+    if (!totpSecret || !user?.email) {
+      setError("Secret or email not available");
+      return;
+    }
+
+    setIsRegeneratingQR(true);
+    setError(null);
+
+    try {
+      const newQrUrl = await regenerateQRCode(totpSecret, user.email);
+      setTotpQrUrl(newQrUrl);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to regenerate QR code";
+      setError(errorMessage);
+    } finally {
+      setIsRegeneratingQR(false);
+    }
+  }, [totpSecret, user?.email]);
+
   const toggleItemType = useCallback(
-    (type: ItemTypeEnum) => {
-      const newTypes = selectedTypes.includes(type)
+    async (type: ItemTypeEnum) => {
+      const isCurrentlySelected = selectedTypes.includes(type);
+      const newTypes = isCurrentlySelected
         ? selectedTypes.filter((t) => t !== type)
         : [...selectedTypes, type];
 
       setSelectedTypes(newTypes);
       form.setValue("type", newTypes);
+
+      if (!isCurrentlySelected && type === "totp") {
+        await generateNewTOTP();
+      }
+
+      if (isCurrentlySelected && type === "totp") {
+        setTotpSecret("");
+        setTotpOtpAuthUrl("");
+        setTotpQrUrl("");
+        form.setValue("totp_seed_ct", "");
+      }
     },
-    [selectedTypes, form]
+    [selectedTypes, form, generateNewTOTP]
   );
 
   const addTag = useCallback(() => {
@@ -240,6 +306,9 @@ function ItemCreationForm() {
           setTagInput("");
           setSelectedTypes([]);
           setTags([]);
+          setTotpSecret("");
+          setTotpOtpAuthUrl("");
+          setTotpQrUrl("");
         } catch (error) {
           const err = error as Error;
           setError(err.message || "An error occurred during item creation.");
@@ -342,13 +411,13 @@ function ItemCreationForm() {
                         key={type}
                         onClick={() => toggleItemType(type)}
                         className={`
-                                                    relative p-3 sm:p-4 rounded-lg border cursor-pointer transition-all duration-200 hover:scale-[1.01]
-                                                    ${
-                                                      isSelected
-                                                        ? `${config.color} border-current`
-                                                        : "bg-gray-800/50 border-gray-700 hover:border-gray-600"
-                                                    }
-                                                `}
+                          relative p-3 sm:p-4 rounded-lg border cursor-pointer transition-all duration-200 hover:scale-[1.01]
+                          ${
+                            isSelected
+                              ? `${config.color} border-current`
+                              : "bg-gray-800/50 border-gray-700 hover:border-gray-600"
+                          }
+                        `}
                       >
                         <div className="flex items-start gap-3">
                           <div
@@ -404,7 +473,6 @@ function ItemCreationForm() {
                 )}
               </div>
 
-              {/* Combined Information Section */}
               {selectedTypes.length > 0 && (
                 <div className="space-y-4 p-3 sm:p-4 bg-gray-800/30 rounded-lg border border-gray-600/50">
                   <div className="flex items-center gap-2 mb-4">
@@ -532,14 +600,97 @@ function ItemCreationForm() {
                           <FormControl>
                             <Input
                               {...field}
+                              value={field.value || totpSecret}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                field.onChange(value);
+                                setTotpSecret(value);
+                              }}
                               type="text"
                               placeholder="Enter TOTP secret key"
                               className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500 focus:border-green-500 font-mono text-sm"
                             />
                           </FormControl>
-                          <p className="text-gray-400 text-xs">
-                            The secret key provided when setting up 2FA
+                          <p className="text-gray-400 text-xs mt-1">
+                            Auto-generated or enter your own secret key
                           </p>
+
+                          {totpSecret && totpOtpAuthUrl && (
+                            <div className="mt-4 space-y-3 p-3 bg-gray-900/50 rounded-lg border border-green-700/30">
+                              <div className="flex items-center gap-2 text-green-400 text-sm">
+                                <Smartphone className="w-4 h-4" />
+                                <span className="font-medium">Scan with Authenticator App</span>
+                              </div>
+
+                              <div className="flex justify-center p-4 bg-white rounded-lg">
+                                <QRCode 
+                                  value={totpOtpAuthUrl} 
+                                  size={200}
+                                  level="H"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <p className="text-xs text-gray-400">
+                                  Scan this QR code with Google Authenticator, Authy, 1Password, or any TOTP app
+                                </p>
+                                
+                                <div className="flex gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleRegenerateQR}
+                                    disabled={isRegeneratingQR}
+                                    className="bg-gray-800 border-gray-700 text-white hover:bg-gray-700 text-xs"
+                                  >
+                                    {isRegeneratingQR ? (
+                                      <>
+                                        <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                                        Regenerating...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <RefreshCw className="w-3 h-3 mr-1" />
+                                        Regenerate QR
+                                      </>
+                                    )}
+                                  </Button>
+
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={generateNewTOTP}
+                                    disabled={isGeneratingTOTP}
+                                    className="bg-gray-800 border-gray-700 text-white hover:bg-gray-700 text-xs"
+                                  >
+                                    {isGeneratingTOTP ? (
+                                      <>
+                                        <Shield className="w-3 h-3 mr-1 animate-pulse" />
+                                        Generating...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Shield className="w-3 h-3 mr-1" />
+                                        New Secret
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {isGeneratingTOTP && !totpSecret && (
+                            <div className="mt-2 p-3 bg-blue-900/20 border border-blue-700/50 rounded-lg">
+                              <p className="text-blue-300 text-xs flex items-center gap-2">
+                                <RefreshCw className="w-4 h-4 animate-spin" />
+                                Generating TOTP secret and QR code...
+                              </p>
+                            </div>
+                          )}
+
                           <FormMessage />
                         </FormItem>
                       )}
