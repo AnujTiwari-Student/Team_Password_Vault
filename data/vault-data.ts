@@ -62,3 +62,5 @@ export async function checkOrgVaultAccessPermissions(userId: string, orgId: stri
 
     return ['owner', 'admin', 'member', 'viewer'].includes(membership.role);
 }
+
+

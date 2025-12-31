@@ -1,13 +1,10 @@
-import { getVaultByOrgId } from "./../data/vault-data";
+import { getVaultByOrgId, getVaultByUserId } from "@/data/vault-data";
 import NextAuth from "next-auth";
 import authConfig from "./auth.config";
 import { prisma } from "@/db";
 import { getUserById, updateUser } from "@/data/users-data";
 import { CustomOAuthAdapter } from "./custom-adapter";
-import { getOrgById } from "@/data/org-data";
 import { Membership, Org, Vault } from "@prisma/client";
-import { getVaultByUserId } from "@/data/vault-data";
-import { getMemberByOrgAndUserId } from "@/data/member-data";
 
 export const {
   handlers,
@@ -57,12 +54,8 @@ export const {
         session.user.public_key = token.public_key as string;
 
         if (token.member) {
-          const allMemberships = token.member;
-          const userMembership = (allMemberships as Membership[]).find(
-            (m) => m.user_id === token.sub
-          );
-
-          session.user.member = userMembership as Membership;
+          // @ts-expect-error TS2322
+          session.user.member = token.member as Membership | Membership[];
         } else {
           session.user.member = null;
         }
@@ -87,19 +80,30 @@ export const {
       const dbUser = await getUserById(token.sub as string);
       if (!dbUser) return token;
 
-      const org = await getOrgById(dbUser.id as string);
+      const personalVault = await getVaultByUserId(dbUser.id as string);
       
+      const memberships = await prisma.membership.findMany({
+        where: { user_id: dbUser.id },
+        include: {
+          org: {
+            include: {
+              vaults: {
+                where: { type: 'org' },
+                take: 1
+              }
+            }
+          }
+        }
+      });
+
+      const org = memberships.length > 0 ? memberships[0].org : null;
+
       if (org) {
         token.org = org;
       }
 
-      const members = await getMemberByOrgAndUserId(
-        org?.id as string,
-        dbUser.id as string
-      );
-      
-      if (members && members.length > 0) {
-        token.member = members;
+      if (memberships && memberships.length > 0) {
+        token.member = memberships;
       } else {
         token.member = null;
       }
@@ -111,19 +115,12 @@ export const {
       token.account_type = dbUser?.account_type;
       token.public_key = dbUser?.public_key as string;
 
-      if (token.account_type === "personal") {
-        const vault = await getVaultByUserId(dbUser.id as string);
-        if (vault) {
-          token.vault = vault;
-        }
-      } else if (token.account_type === "org") {
-        const vault = await getVaultByOrgId(org?.id as string);
-        if (vault) {
-          token.vault = vault;
-        }
+      if (dbUser.account_type === "personal") {
+        token.vault = personalVault;
+      } else if (dbUser.account_type === "org" && org) {
+        const orgVault = await getVaultByOrgId(org.id);
+        token.vault = orgVault;
       }
-
-      console.log("Before modifying JWT Token:", token);
 
       return {
         ...token,

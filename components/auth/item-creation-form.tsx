@@ -1,3 +1,5 @@
+"use client"
+
 import React, { useState, useCallback } from "react";
 import {
   Form,
@@ -31,6 +33,8 @@ import {
   User,
   RefreshCw,
   Smartphone,
+  Check,
+  AlertCircle,
 } from "lucide-react";
 import {
   generateRandomBytes,
@@ -75,7 +79,21 @@ const ITEM_TYPE_CONFIG: Record<ItemTypeEnum, ItemTypeConfig> = {
   },
 };
 
-function ItemCreationForm() {
+interface ItemCreationFormProps {
+  vaultId?: string;
+  vaultType?: 'personal' | 'org';
+  orgId?: string;
+  onSuccess?: () => void;
+  onCancel?: () => void;
+}
+
+function ItemCreationForm({ 
+  vaultId: providedVaultId, 
+  vaultType: providedVaultType = 'personal',
+  orgId,
+  onSuccess,
+  onCancel
+}: ItemCreationFormProps) {
   const user = useCurrentUser();
   const [mnemonic, setMnemonic] = useState<string>("");
   const [tagInput, setTagInput] = useState<string>("");
@@ -87,12 +105,17 @@ function ItemCreationForm() {
   const [isGeneratingTOTP, setIsGeneratingTOTP] = useState(false);
   const [isRegeneratingQR, setIsRegeneratingQR] = useState(false);
 
+  // Use provided vault info or fallback to personal
+  const effectiveVaultId = providedVaultId || user?.vault?.id || null;
+  const effectiveVaultType = providedVaultType || 'personal';
+
   const { umkCryptoKey, privateKeyBase64 } = useUserMasterKey(mnemonic || null);
-  const ovkCryptoKey = useVaultOVK(
+  const { ovkCryptoKey, error: ovkError } = useVaultOVK(
     umkCryptoKey,
-    user?.vault?.id || null,
-    user?.vault?.type,
-    privateKeyBase64
+    effectiveVaultId,
+    effectiveVaultType,
+    privateKeyBase64,
+    orgId
   );
 
   const [isPending, startTransition] = React.useTransition();
@@ -108,7 +131,7 @@ function ItemCreationForm() {
       username_ct: "",
       password_ct: "",
       totp_seed_ct: "",
-      vaultId: user?.vault?.id || "",
+      vaultId: effectiveVaultId || "",
       item_key_wrapped: "",
       type: [],
       tags: [],
@@ -221,13 +244,18 @@ function ItemCreationForm() {
 
       if (!ovkCryptoKey) {
         setError(
-          "Vault key not loaded yet. Please enter your master passphrase."
+          "Vault key not loaded yet. Please enter your master passphrase and wait for the vault key to load."
         );
         return;
       }
 
       if (!mnemonic.trim()) {
         setError("Master passphrase is required for encryption.");
+        return;
+      }
+
+      if (!effectiveVaultId) {
+        setError("Vault ID is missing.");
         return;
       }
 
@@ -279,7 +307,7 @@ function ItemCreationForm() {
           const payload = {
             item_name: data.item_name,
             item_url: data.item_url,
-            vaultId: data.vaultId,
+            vaultId: effectiveVaultId,
             type: selectedTypes,
             tags: tags,
             item_key_wrapped: itemKeyWrapped,
@@ -301,6 +329,11 @@ function ItemCreationForm() {
           }
 
           setSuccess("Item created and encrypted successfully!");
+          
+          // Call onSuccess callback
+          onSuccess?.();
+          
+          // Reset form
           form.reset();
           setMnemonic("");
           setTagInput("");
@@ -315,7 +348,7 @@ function ItemCreationForm() {
         }
       });
     },
-    [ovkCryptoKey, form, selectedTypes, tags, mnemonic]
+    [ovkCryptoKey, form, selectedTypes, tags, mnemonic, effectiveVaultId, onSuccess]
   );
 
   const needsURL =
@@ -333,8 +366,7 @@ function ItemCreationForm() {
           Create Vault Item
         </h2>
         <p className="text-gray-400 text-sm">
-          Store your passwords, notes, and 2FA keys securely - mix and match as
-          needed
+          Store your passwords, notes, and 2FA keys securely in your {effectiveVaultType === 'personal' ? 'personal' : 'organization'} vault
         </p>
       </div>
 
@@ -370,6 +402,38 @@ function ItemCreationForm() {
                   </FormItem>
                 )}
               />
+
+              {/* Vault Key Status */}
+              {mnemonic && (
+                <div className="space-y-2">
+                  {ovkError && (
+                    <div className="p-3 bg-red-900/20 border border-red-700/50 rounded-lg">
+                      <p className="text-red-300 text-sm flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        <span>Vault key error: {ovkError}</span>
+                      </p>
+                    </div>
+                  )}
+                  
+                  {!ovkError && !ovkCryptoKey && (
+                    <div className="p-3 bg-blue-900/20 border border-blue-700/50 rounded-lg">
+                      <p className="text-blue-300 text-sm flex items-center gap-2">
+                        <RefreshCw className="w-4 h-4 animate-spin flex-shrink-0" />
+                        <span>Loading vault encryption key...</span>
+                      </p>
+                    </div>
+                  )}
+                  
+                  {ovkCryptoKey && !ovkError && (
+                    <div className="p-3 bg-green-900/20 border border-green-700/50 rounded-lg">
+                      <p className="text-green-300 text-sm flex items-center gap-2">
+                        <Check className="w-4 h-4 flex-shrink-0" />
+                        <span>Vault ready - You can now create items</span>
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <FormField
                 control={form.control}
@@ -780,14 +844,47 @@ function ItemCreationForm() {
         </div>
       </div>
 
-      <div className="flex-shrink-0 pt-4 border-t border-gray-700/50 mt-4">
+      <div className="flex-shrink-0 pt-4 border-t border-gray-700/50 mt-4 flex gap-2">
+        {onCancel && (
+          <Button
+            type="button"
+            onClick={onCancel}
+            variant="outline"
+            className="flex-1 bg-gray-800 border-gray-700 hover:bg-gray-700 text-white h-10 sm:h-11 text-sm sm:text-base"
+            disabled={isPending}
+          >
+            Cancel
+          </Button>
+        )}
         <Button
           type="submit"
           onClick={form.handleSubmit(onSubmit)}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed h-10 sm:h-11 text-sm sm:text-base"
-          disabled={isPending || !ovkCryptoKey || selectedTypes.length === 0}
+          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed h-10 sm:h-11 text-sm sm:text-base"
+          disabled={isPending || !ovkCryptoKey || selectedTypes.length === 0 || !mnemonic.trim()}
         >
-          {isPending ? "Creating..." : "Add Item"}
+          {isPending ? (
+            <>
+              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+              Creating...
+            </>
+          ) : !mnemonic.trim() ? (
+            <>
+              <Lock className="w-4 h-4 mr-2" />
+              Enter Passphrase
+            </>
+          ) : !ovkCryptoKey ? (
+            <>
+              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+              Loading Key...
+            </>
+          ) : selectedTypes.length === 0 ? (
+            "Select Item Type"
+          ) : (
+            <>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Item
+            </>
+          )}
         </Button>
       </div>
     </div>

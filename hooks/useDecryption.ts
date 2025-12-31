@@ -1,30 +1,18 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { unwrapKey, decryptData } from '@/utils/client-crypto';
-
-interface DecryptedData {
-  username?: string;
-  password?: string;
-  totp_seed?: string;
-  note?: string;
-}
-
-interface APIVaultItem {
-  id: string;
-  name: string;
-  url?: string;
-  type: string[];
-  tags: string[];
-  item_key_wrapped: string;
-  username_ct?: string;
-  password_ct?: string;
-  totp_seed_ct?: string;
-  note_ct?: string;
-  updated_at: string;
-}
+import { APIVaultItem, DecryptedData } from '@/types/vault';
+import { useSessionTimeout } from './useSessionTimeout';
 
 export function useDecryption(ovkCryptoKey: CryptoKey | null) {
   const [decryptedItems, setDecryptedItems] = useState<Record<string, DecryptedData>>({});
   const [decrypting, setDecrypting] = useState<Record<string, boolean>>({});
+  const { isActive } = useSessionTimeout();
+
+  useEffect(() => {
+    if (!isActive) {
+      setDecryptedItems({});
+    }
+  }, [isActive]);
 
   const decryptItem = useCallback(async (item: APIVaultItem): Promise<DecryptedData | null> => {
     if (!ovkCryptoKey || !item.item_key_wrapped) {
@@ -89,10 +77,15 @@ export function useDecryption(ovkCryptoKey: CryptoKey | null) {
     return decrypting[itemId] || false;
   }, [decrypting]);
 
+  const clearDecryptedData = useCallback(() => {
+    setDecryptedItems({});
+  }, []);
+
   return {
     decryptItem,
     getDecryptedItem,
     isDecrypting,
-    decryptedItems
+    decryptedItems,
+    clearDecryptedData,
   };
 }

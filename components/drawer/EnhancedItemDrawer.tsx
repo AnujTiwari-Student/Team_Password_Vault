@@ -1,8 +1,12 @@
 "use client"
 
 import React, { useState, useEffect } from 'react';
-import { X, User, Lock, Shield, FileText, ExternalLink, Eye, EyeOff, Edit, Copy, BookCopy } from 'lucide-react';
+import { X, User, Lock, Shield, FileText, ExternalLink, Edit } from 'lucide-react';
 import { APIVaultItem, DecryptedData, MemberRole } from '@/types/vault';
+import { CopyButton } from '@/components/common/CopyButton';
+import { FieldDisplay } from '@/components/common/FieldDisplay';
+import { useItemActions } from '@/hooks/useItemActions';
+import { getRoleBadgeColor, getMultiTypeColor, formatTimestamp } from '@/utils/vault-helpers';
 
 interface EnhancedItemDrawerProps {
   isOpen: boolean;
@@ -12,7 +16,6 @@ interface EnhancedItemDrawerProps {
   userRole: MemberRole | null;
   canDecrypt: boolean;
   canEdit: boolean;
-  onCopyEncrypted: (value: string, field: string) => void;
   onEdit?: () => void;
 }
 
@@ -24,11 +27,9 @@ export const EnhancedItemDrawer: React.FC<EnhancedItemDrawerProps> = ({
   userRole,
   canDecrypt,
   canEdit,
-  onCopyEncrypted,
   onEdit 
 }) => {
-  const [copiedField, setCopiedField] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const { copiedField, copyToClipboard, copyEncrypted } = useItemActions();
 
   useEffect(() => {
     if (isOpen) {
@@ -42,42 +43,10 @@ export const EnhancedItemDrawer: React.FC<EnhancedItemDrawerProps> = ({
     };
   }, [isOpen]);
 
-  const handleCopy = async (text: string, field: string): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedField(field);
-      setTimeout(() => setCopiedField(null), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
-
   if (!isOpen || !item) return null;
 
-  const getTypeColor = (types: string[]): string => {
-    if (types.length === 1) {
-      switch (types[0]) {
-        case 'login':
-          return 'bg-blue-900/30 text-blue-300 border-blue-700/30';
-        case 'note':
-          return 'bg-purple-900/30 text-purple-300 border-purple-700/30';
-        case 'totp':
-          return 'bg-green-900/30 text-green-300 border-green-700/30';
-        default:
-          return 'bg-gray-900/30 text-gray-300 border-gray-700/30';
-      }
-    }
-    return 'bg-gradient-to-r from-blue-900/30 to-green-900/30 text-white border-blue-700/30';
-  };
-
-  const getRoleBadgeColor = (role: MemberRole | null): string => {
-    switch (role) {
-      case 'owner': return 'bg-yellow-900/30 text-yellow-300 border-yellow-700/30';
-      case 'admin': return 'bg-blue-900/30 text-blue-300 border-blue-700/30';
-      case 'member': return 'bg-green-900/30 text-green-300 border-green-700/30';
-      case 'viewer': return 'bg-gray-900/30 text-gray-300 border-gray-700/30';
-      default: return 'bg-gray-900/30 text-gray-300 border-gray-700/30';
-    }
+  const isFieldDecrypted = (field: keyof DecryptedData) => {
+    return canDecrypt && decryptedData && decryptedData[field] !== undefined;
   };
 
   return (
@@ -93,10 +62,10 @@ export const EnhancedItemDrawer: React.FC<EnhancedItemDrawerProps> = ({
           <div className="flex-1 min-w-0 pr-4">
             <h2 className="text-xl sm:text-2xl font-bold text-white mb-2 truncate">{item.name}</h2>
             <div className="flex flex-wrap gap-1 items-center">
-              {item.type.map((type: string, index: number) => (
+              {item.type.map((type, index) => (
                 <span 
                   key={index}
-                  className={`inline-block px-2 sm:px-3 py-1 text-xs font-medium rounded-full border ${getTypeColor([type])}`}
+                  className={`inline-block px-2 sm:px-3 py-1 text-xs font-medium rounded-full border ${getMultiTypeColor([type])}`}
                 >
                   {type.charAt(0).toUpperCase() + type.slice(1)}
                 </span>
@@ -146,128 +115,40 @@ export const EnhancedItemDrawer: React.FC<EnhancedItemDrawerProps> = ({
                 >
                   {item.url}
                 </a>
-                <button
-                  onClick={() => handleCopy(item.url!, 'url')}
-                  className="p-2.5 sm:p-3 bg-gray-800/50 backdrop-blur-sm border border-gray-700/30 hover:bg-gray-700/50 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
+                <CopyButton
+                  onClick={() => copyToClipboard(item.url!, 'URL')}
+                  isCopied={copiedField === 'URL'}
                   title="Copy URL"
-                  type="button"
-                >
-                  {copiedField === 'url' ? '✓' : <BookCopy size={22} />}
-                </button>
+                />
               </div>
             </div>
           )}
 
           {item.username_ct && (
-            <div className="space-y-2">
-              <label className="flex items-center text-sm font-medium text-gray-300">
-                <User className="w-4 h-4 mr-2" />
-                Username/Email
-                {!canDecrypt && <span className="ml-1 text-xs text-gray-500">(Encrypted)</span>}
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={
-                    canDecrypt 
-                      ? (decryptedData?.username || '[Enter master passphrase to decrypt]')
-                      : '[Encrypted - contact vault owner to decrypt]'
-                  }
-                  readOnly
-                  className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-gray-800/50 backdrop-blur-sm border border-gray-700/30 rounded-xl text-white focus:outline-none text-sm sm:text-base cursor-pointer"
-                  onClick={() => handleCopy(
-                    canDecrypt 
-                      ? (decryptedData?.username || item.username_ct!)
-                      : item.username_ct!, 
-                    'username'
-                  )}
-                />
-                <button
-                  onClick={() => handleCopy(
-                    canDecrypt 
-                      ? (decryptedData?.username || item.username_ct!)
-                      : item.username_ct!, 
-                    'username'
-                  )}
-                  className="p-2.5 sm:p-3 bg-gray-800/50 backdrop-blur-sm border border-gray-700/30 hover:bg-gray-700/50 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
-                  title={canDecrypt ? "Copy username" : "Copy encrypted username"}
-                  type="button"
-                >
-                  {copiedField === 'username' ? '✓' : <BookCopy size={22} />}
-                </button>
-                {!canDecrypt && (
-                  <button
-                    onClick={() => onCopyEncrypted(item.username_ct!, 'username_encrypted')}
-                    className="p-2.5 sm:p-3 bg-gray-700/50 backdrop-blur-sm border border-gray-600/30 hover:bg-gray-600/50 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
-                    title="Copy encrypted value"
-                    type="button"
-                  >
-                    <Copy className="w-4 h-4 text-gray-400" />
-                  </button>
-                )}
-              </div>
-            </div>
+            <FieldDisplay
+              label="Username/Email"
+              icon={User}
+              value={decryptedData?.username || ''}
+              isEncrypted={!isFieldDecrypted('username')}
+              canDecrypt={canDecrypt}
+              onCopy={() => copyToClipboard(decryptedData?.username || '', 'username')}
+              onCopyEncrypted={!canDecrypt ? () => copyEncrypted(item.username_ct!, 'username') : undefined}
+              isCopied={copiedField === 'username'}
+            />
           )}
 
           {item.password_ct && (
-            <div className="space-y-2">
-              <label className="flex items-center text-sm font-medium text-gray-300">
-                <Lock className="w-4 h-4 mr-2" />
-                Password
-                {!canDecrypt && <span className="ml-1 text-xs text-gray-500">(Encrypted)</span>}
-              </label>
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={
-                      canDecrypt 
-                        ? (decryptedData?.password || '[Enter master passphrase to decrypt]')
-                        : '[Encrypted - contact vault owner to decrypt]'
-                    }
-                    readOnly
-                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-gray-800/50 backdrop-blur-sm border border-gray-700/30 rounded-xl text-white focus:outline-none text-sm sm:text-base cursor-pointer font-mono pr-10"
-                    onClick={() => handleCopy(
-                      canDecrypt 
-                        ? (decryptedData?.password || item.password_ct!)
-                        : item.password_ct!, 
-                      'password'
-                    )}
-                  />
-                  <button
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-700/30 rounded transition-colors"
-                    title={showPassword ? "Hide" : "Show"}
-                    type="button"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4 text-gray-400" /> : <Eye className="w-4 h-4 text-gray-400" />}
-                  </button>
-                </div>
-                <button
-                  onClick={() => handleCopy(
-                    canDecrypt 
-                      ? (decryptedData?.password || item.password_ct!)
-                      : item.password_ct!, 
-                    'password'
-                  )}
-                  className="p-2.5 sm:p-3 bg-gray-800/50 backdrop-blur-sm border border-gray-700/30 hover:bg-gray-700/50 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
-                  title={canDecrypt ? "Copy password" : "Copy encrypted password"}
-                  type="button"
-                >
-                  {copiedField === 'password' ? '✓' : <BookCopy size={22} />}
-                </button>
-                {!canDecrypt && (
-                  <button
-                    onClick={() => onCopyEncrypted(item.password_ct!, 'password_encrypted')}
-                    className="p-2.5 sm:p-3 bg-gray-700/50 backdrop-blur-sm border border-gray-600/30 hover:bg-gray-600/50 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
-                    title="Copy encrypted value"
-                    type="button"
-                  >
-                    <Copy className="w-4 h-4 text-gray-400" />
-                  </button>
-                )}
-              </div>
-            </div>
+            <FieldDisplay
+              label="Password"
+              icon={Lock}
+              value={decryptedData?.password || ''}
+              isEncrypted={!isFieldDecrypted('password')}
+              canDecrypt={canDecrypt}
+              isPassword={true}
+              onCopy={() => copyToClipboard(decryptedData?.password || '', 'password')}
+              onCopyEncrypted={!canDecrypt ? () => copyEncrypted(item.password_ct!, 'password') : undefined}
+              isCopied={copiedField === 'password'}
+            />
           )}
 
           {item.totp_seed_ct && (
@@ -275,49 +156,41 @@ export const EnhancedItemDrawer: React.FC<EnhancedItemDrawerProps> = ({
               <label className="flex items-center text-sm font-medium text-gray-300">
                 <Shield className="w-4 h-4 mr-2" />
                 TOTP Secret
-                {!canDecrypt && <span className="ml-1 text-xs text-gray-500">(Encrypted)</span>}
+                {!isFieldDecrypted('totp_seed') && <span className="ml-1 text-xs text-gray-500">(Encrypted)</span>}
               </label>
               <div className="flex items-center gap-2">
                 <div className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-gradient-to-r from-green-900/20 to-blue-900/20 border border-green-700/30 rounded-xl">
-                  <div className="flex items-center justify-between">
-                    <span 
-                      className="text-green-300 font-mono text-sm cursor-pointer"
-                      onClick={() => handleCopy(
-                        canDecrypt 
-                          ? (decryptedData?.totp_seed || item.totp_seed_ct!)
-                          : item.totp_seed_ct!, 
-                        'totp'
-                      )}
-                    >
-                      {canDecrypt 
-                        ? (decryptedData?.totp_seed || '[Enter master passphrase to decrypt]')
-                        : '[Encrypted - contact vault owner to decrypt]'
+                  <span 
+                    className="text-green-300 font-mono text-sm cursor-pointer"
+                    onClick={() => {
+                      if (decryptedData?.totp_seed) {
+                        copyToClipboard(decryptedData.totp_seed, 'TOTP secret');
                       }
-                    </span>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleCopy(
-                    canDecrypt 
-                      ? (decryptedData?.totp_seed || item.totp_seed_ct!)
-                      : item.totp_seed_ct!, 
-                    'totp'
-                  )}
-                  className="p-2.5 sm:p-3 bg-green-800/50 backdrop-blur-sm border border-green-700/30 hover:bg-green-700/50 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
-                  title={canDecrypt ? "Copy TOTP secret" : "Copy encrypted TOTP secret"}
-                  type="button"
-                >
-                  {copiedField === 'totp' ? '✓' : <BookCopy size={22} />}
-                </button>
-                {!canDecrypt && (
-                  <button
-                    onClick={() => onCopyEncrypted(item.totp_seed_ct!, 'totp_encrypted')}
-                    className="p-2.5 sm:p-3 bg-gray-700/50 backdrop-blur-sm border border-gray-600/30 hover:bg-gray-600/50 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
-                    title="Copy encrypted value"
-                    type="button"
+                    }}
                   >
-                    <Copy className="w-4 h-4 text-gray-400" />
-                  </button>
+                    {isFieldDecrypted('totp_seed')
+                      ? decryptedData!.totp_seed
+                      : canDecrypt
+                      ? '[Locked - Click item to decrypt]'
+                      : '[Encrypted - contact vault owner]'}
+                  </span>
+                </div>
+                <CopyButton
+                  onClick={() => {
+                    if (decryptedData?.totp_seed) {
+                      copyToClipboard(decryptedData.totp_seed, 'TOTP secret');
+                    }
+                  }}
+                  isCopied={copiedField === 'TOTP secret'}
+                  title="Copy TOTP secret"
+                />
+                {!canDecrypt && (
+                  <CopyButton
+                    onClick={() => copyEncrypted(item.totp_seed_ct!, 'TOTP secret')}
+                    isCopied={false}
+                    variant="encrypted"
+                    title="Copy encrypted value"
+                  />
                 )}
               </div>
             </div>
@@ -328,39 +201,40 @@ export const EnhancedItemDrawer: React.FC<EnhancedItemDrawerProps> = ({
               <label className="flex items-center text-sm font-medium text-gray-300">
                 <FileText className="w-4 h-4 mr-2" />
                 Secure Note
-                {!canDecrypt && <span className="ml-1 text-xs text-gray-500">(Encrypted)</span>}
+                {!isFieldDecrypted('note') && <span className="ml-1 text-xs text-gray-500">(Encrypted)</span>}
               </label>
-              <div className="px-3 sm:px-4 py-3 sm:py-4 bg-purple-900/10 backdrop-blur-sm border border-purple-700/30 rounded-xl text-purple-300 text-sm sm:text-base cursor-pointer hover:bg-purple-900/20 transition-colors"
-                onClick={() => handleCopy(
-                  canDecrypt 
-                    ? (decryptedData?.note || item.note_ct!)
-                    : item.note_ct!, 
-                  'note'
-                )}
+              <div 
+                className="px-3 sm:px-4 py-3 sm:py-4 bg-purple-900/10 backdrop-blur-sm border border-purple-700/30 rounded-xl text-purple-300 text-sm sm:text-base cursor-pointer hover:bg-purple-900/20 transition-colors min-h-[100px]"
+                onClick={() => {
+                  if (decryptedData?.note) {
+                    copyToClipboard(decryptedData.note, 'note');
+                  }
+                }}
               >
                 <p className="whitespace-pre-wrap">
-                  {canDecrypt 
-                    ? (decryptedData?.note || '[Enter master passphrase to decrypt]')
-                    : '[Encrypted - contact vault owner to decrypt]'
-                  }
+                  {isFieldDecrypted('note')
+                    ? decryptedData!.note
+                    : canDecrypt
+                    ? '[Locked - Click item to decrypt]'
+                    : '[Encrypted - contact vault owner]'}
                 </p>
               </div>
               <div className="flex justify-end gap-2">
                 <button
-                  onClick={() => handleCopy(
-                    canDecrypt 
-                      ? (decryptedData?.note || item.note_ct!)
-                      : item.note_ct!, 
-                    'note'
-                  )}
+                  onClick={() => {
+                    if (decryptedData?.note) {
+                      copyToClipboard(decryptedData.note, 'note');
+                    }
+                  }}
                   className="text-xs bg-purple-800/50 hover:bg-purple-700/50 px-3 py-1 rounded-lg transition-colors"
                   type="button"
+                  disabled={!decryptedData?.note}
                 >
                   {copiedField === 'note' ? 'Copied!' : 'Copy'}
                 </button>
                 {!canDecrypt && (
                   <button
-                    onClick={() => onCopyEncrypted(item.note_ct!, 'note_encrypted')}
+                    onClick={() => copyEncrypted(item.note_ct!, 'note')}
                     className="text-xs bg-gray-700/50 hover:bg-gray-600/50 px-3 py-1 rounded-lg transition-colors"
                     type="button"
                   >
@@ -377,7 +251,7 @@ export const EnhancedItemDrawer: React.FC<EnhancedItemDrawerProps> = ({
                 🏷️ Tags
               </label>
               <div className="flex flex-wrap gap-2">
-                {item.tags.map((tag: string, idx: number) => (
+                {item.tags.map((tag, idx) => (
                   <span
                     key={idx}
                     className="px-3 py-1 text-sm rounded-full border backdrop-blur-sm transition-all hover:scale-105 bg-gray-700/30 text-gray-300 border-gray-600/30"
@@ -397,7 +271,7 @@ export const EnhancedItemDrawer: React.FC<EnhancedItemDrawerProps> = ({
               </div>
               <div className="flex justify-between items-center">
                 <span>Last Updated:</span>
-                <span className="text-gray-400">{new Date(item.updated_at).toLocaleString()}</span>
+                <span className="text-gray-400">{formatTimestamp(item.updated_at)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span>Item Types:</span>
@@ -426,7 +300,7 @@ export const EnhancedItemDrawer: React.FC<EnhancedItemDrawerProps> = ({
             {canEdit && onEdit && (
               <button 
                 onClick={onEdit}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-700/50 backdrop-blur-sm border border-gray-600/30 text-white rounded-xl hover:bg-gray-600/50 transition-all duration-200 hover:scale-105 active:scale-95"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600/80 backdrop-blur-sm border border-blue-500/30 text-white rounded-xl hover:bg-blue-600 transition-all duration-200 hover:scale-105 active:scale-95"
                 type="button"
               >
                 <Edit className="w-4 h-4" />
@@ -439,7 +313,7 @@ export const EnhancedItemDrawer: React.FC<EnhancedItemDrawerProps> = ({
             <p className="text-gray-400 text-xs">
               <strong>Note:</strong> {
                 canDecrypt 
-                  ? (decryptedData ? "Data has been decrypted and is ready to use." : "Enter your master passphrase above to decrypt and view sensitive data.")
+                  ? (decryptedData ? "Data has been decrypted and is ready to use." : "Click the item to decrypt and view sensitive data.")
                   : "You have view-only access. You can copy encrypted values but cannot decrypt them."
               }
             </p>

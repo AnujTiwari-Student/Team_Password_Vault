@@ -30,6 +30,7 @@ import {
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useRouter, useSearchParams } from "next/navigation";
 import CreateOrgForm from "../auth/CreateOrgForm";
+import { canCreateOrg } from "@/utils/permission-utils";
 
 interface Organization {
   id: string;
@@ -44,30 +45,6 @@ interface Organization {
   };
 }
 
-const dummyOrgs: Organization[] = [
-  {
-    id: "1",
-    name: "Acme Corp",
-    role: "owner",
-    created_at: "2024-01-15T00:00:00Z",
-    isOwner: true,
-  },
-  {
-    id: "2", 
-    name: "Tech Startup Inc",
-    role: "admin",
-    created_at: "2024-02-20T00:00:00Z",
-    isOwner: false,
-  },
-  {
-    id: "3",
-    name: "Design Agency",
-    role: "member",
-    created_at: "2024-03-10T00:00:00Z",
-    isOwner: false,
-  }
-];
-
 export function TeamSwitcher() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -75,10 +52,14 @@ export function TeamSwitcher() {
   const { isMobile } = useSidebar();
 
   const [showLoading, setShowLoading] = useState(false);
-  const [organizations, setOrganizations] = useState<Organization[]>(dummyOrgs);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [activeOrg, setActiveOrg] = useState<Organization | null>(null);
   const [isLoadingOrgs, setIsLoadingOrgs] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const canUserCreateOrg = React.useMemo(() => {
+    return canCreateOrg(user);
+  }, [user]);
 
   useEffect(() => {
     const orgIdFromUrl = searchParams.get('org');
@@ -135,10 +116,7 @@ export function TeamSwitcher() {
       }
     } catch (error) {
       console.error('Failed to fetch organizations:', error);
-      setOrganizations(dummyOrgs);
-      if (!activeOrg) {
-        setActiveOrg(dummyOrgs[0]);
-      }
+      setOrganizations([]);
     } finally {
       setIsLoadingOrgs(false);
     }
@@ -158,18 +136,21 @@ export function TeamSwitcher() {
   };
 
   const handleCreateOrg = (): void => {
+    if (!canUserCreateOrg) {
+      return;
+    }
     setIsDialogOpen(true);
   };
 
   const handleOrgCreated = (): void => {
     fetchOrganizations();
+    setIsDialogOpen(false);
   };
 
   const handleOrgSwitch = (org: Organization): void => {
     setActiveOrg(org);
     updateUrlWithOrg(org.id);
     
-    // Trigger a custom event for other components to listen to
     window.dispatchEvent(new CustomEvent('organizationChanged', { 
       detail: { 
         organization: org,
@@ -209,7 +190,7 @@ export function TeamSwitcher() {
 
   const hasOrganizations = organizations.length > 0;
   const displayName = activeOrg?.name ? `${activeOrg.name}` : `${user.name} (Personal Workspace)`;
-  const displayPlan = 'Free Plan'; // You can make this dynamic based on org plan
+  const displayPlan = 'Free Plan';
   const isPersonalWorkspace = activeOrg === null;
 
   return (
@@ -290,17 +271,21 @@ export function TeamSwitcher() {
                 </DropdownMenuItem>
               ))}
               
-              <DropdownMenuSeparator className="bg-gray-700" />
-              
-              <DropdownMenuItem 
-                onClick={handleCreateOrg}
-                className="gap-2 p-2 text-white hover:bg-gray-700 focus:bg-gray-700"
-              >
-                <div className="flex size-6 items-center justify-center rounded-md border border-gray-600 bg-transparent">
-                  <Plus className="size-4" />
-                </div>
-                <div className="text-gray-400 font-medium">Create organization</div>
-              </DropdownMenuItem>
+              {canUserCreateOrg && (
+                <>
+                  <DropdownMenuSeparator className="bg-gray-700" />
+                  
+                  <DropdownMenuItem 
+                    onClick={handleCreateOrg}
+                    className="gap-2 p-2 text-white hover:bg-gray-700 focus:bg-gray-700"
+                  >
+                    <div className="flex size-6 items-center justify-center rounded-md border border-gray-600 bg-transparent">
+                      <Plus className="size-4" />
+                    </div>
+                    <div className="text-blue-400 font-medium">Create organization</div>
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </SidebarMenuItem>

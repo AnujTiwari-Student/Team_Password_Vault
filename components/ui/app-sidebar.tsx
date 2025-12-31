@@ -33,20 +33,6 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const user = useCurrentUser();
 
-  const isOrganizationMember = React.useMemo(() => {
-    if (!user?.member) return false;
-
-    const memberships = Array.isArray(user.member) ? user.member : [user.member];
-    
-    const hasNonOwnerMembership = memberships.some(membership => {
-      return membership.role !== 'owner' && membership.org_id !== user.org?.id;
-    });
-
-    const isPersonalUser = user.account_type === 'personal';
-    
-    return hasNonOwnerMembership || (isPersonalUser && memberships.length > 0);
-  }, [user]);
-
   const isOrgAccount = React.useMemo(() => {
     return user?.account_type === 'org';
   }, [user?.account_type]);
@@ -97,13 +83,8 @@ export function AppSidebar({
             title: "Items",
             url: "#",
           },
-          ...(isOrganizationMember ? [{
-            title: "Org Items",
-            url: "#",
-          }] : []),
         ],
       },
-      // Only show Teams section for organization accounts
       ...(isOrgAccount ? [{
         title: "Teams",
         url: "#",
@@ -140,6 +121,7 @@ export function AppSidebar({
   return (
     <Sidebar className="py-2" variant="sidebar" collapsible="icon" {...props}>
       <SidebarHeader className="bg-gray-900">
+        {/* @ts-expect-error Todo: Type missmatch */}
         <TeamSwitcher teams={data.teams} />
       </SidebarHeader>
       <SidebarContent className="bg-gray-900">
