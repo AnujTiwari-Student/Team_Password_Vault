@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Edit, Save, X } from 'lucide-react';
 import { Vault } from '@/types/vault';
+import { toast } from 'sonner';
 
 interface VaultNameEditorProps {
   vault: Vault;
@@ -20,21 +21,25 @@ export const VaultNameEditor: React.FC<VaultNameEditorProps> = ({ vault }) => {
 
     setLoading(true);
     try {
-      const response = await fetch(`/api/vault/${vault.id}/name`, {
+      const response = await fetch(`/api/vault/${vault.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: vaultName.trim() })
       });
 
+      const data = await response.json();
+
       if (response.ok) {
+        toast.success('Vault name updated successfully');
         setIsEditing(false);
-        window.location.reload();
+        setTimeout(() => window.location.reload(), 1000);
       } else {
-        throw new Error('Failed to update vault name');
+        throw new Error(data.error || 'Failed to update vault name');
       }
-    } catch (error) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update vault name';
       console.error('Error updating vault name:', error);
-      alert('Failed to update vault name');
+      toast.error(errorMessage);
       setVaultName(vault.name);
     } finally {
       setLoading(false);
@@ -57,10 +62,7 @@ export const VaultNameEditor: React.FC<VaultNameEditorProps> = ({ vault }) => {
         <div className="flex items-center gap-3">
           {isEditing ? (
             <div className="flex-1 flex items-center gap-3">
-
-              {/* Todo: Make a form to change vault name */}
-
-              {/* <input
+              <input
                 type="text"
                 value={vaultName}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setVaultName(e.target.value)}
@@ -68,7 +70,8 @@ export const VaultNameEditor: React.FC<VaultNameEditorProps> = ({ vault }) => {
                 placeholder="Enter vault name..."
                 maxLength={50}
                 disabled={loading}
-              /> */}
+                autoFocus
+              />
               <button
                 onClick={handleSave}
                 disabled={loading || !vaultName.trim()}

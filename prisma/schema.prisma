@@ -57,32 +57,33 @@ enum InviteStatus {
 }
 
 model User {
-  id                         String       @id @default(auto()) @map("_id") @db.ObjectId
-  email                      String       @unique
+  id                         String         @id @default(auto()) @map("_id") @db.ObjectId
+  email                      String         @unique
   name                       String?
   image                      String?
   email_verified             DateTime?
   auth_hash                  String?
-  auth_provider              AuthProvider @default(oauth)
+  auth_provider              AuthProvider   @default(oauth)
   umk_salt                   String?
   master_passphrase_verifier String?
-  twofa_enabled              Boolean      @default(false)
+  twofa_enabled              Boolean        @default(false)
   totp_secret                String?
   backup_codes               String[]
   public_key                 String?
-  created_at                 DateTime     @default(now())
+  created_at                 DateTime       @default(now())
   last_login                 DateTime?
   account_type               String
   accounts                   Account[]
   vaults                     Vault[]
-  orgs                       Org[]        @relation("OrgOwner")
+  orgs                       Org[]          @relation("OrgOwner")
   memberships                Membership[]
-  items                      Item[]       @relation("ItemCreator")
-  shares                     Share[]      @relation("ShareGranteeUser")
-  audits                     Audit[]      @relation("AuditActor")
-  invitesSent                Invite[]     @relation("InvitedBy")
+  items                      Item[]         @relation("ItemCreator")
+  shares                     Share[]        @relation("ShareGranteeUser")
+  audits                     Audit[]        @relation("AuditActor")
+  invitesSent                Invite[]       @relation("InvitedBy")
   logs                       Logs[]
-  created_teams              Team[]       @relation("TeamCreator")
+  created_teams              Team[]         @relation("TeamCreator")
+  Subscription               Subscription[]
 
   @@index([account_type])
   @@index([created_at])
@@ -118,7 +119,7 @@ model Org {
   vaults        Vault[]
   invites       Invite[]
   audits        Audit[]
-  teams         Team[]     
+  teams         Team[]
 
   @@index([owner_user_id])
   @@index([created_at])
@@ -180,7 +181,8 @@ model Vault {
   orgVaultKeyId      String?           @db.ObjectId
   PersonalVaultKey   PersonalVaultKey? @relation(fields: [personalVaultKeyId], references: [id])
   personalVaultKeyId String?           @db.ObjectId
-  teams              Team[]            
+  teams              Team[]
+  Subscription       Subscription[]
 
   @@unique([org_id, name])
   @@unique([user_id, name])
@@ -216,7 +218,7 @@ model Item {
   @@index([name])
   @@index([vault_id, type])
   @@index([vault_id, updated_at])
-  @@map("item_types") 
+  @@map("item_types")
 }
 
 model Share {
@@ -290,17 +292,17 @@ model Invite {
   org_id     String       @db.ObjectId
   email      String
   role       MemberRole   @default(member)
-  status     InviteStatus @default(pending) 
-  token      String       @unique @default(cuid()) 
+  status     InviteStatus @default(pending)
+  token      String       @unique @default(cuid())
   expires_at DateTime
   invited_by String       @db.ObjectId
-  created_at DateTime     @default(now()) 
+  created_at DateTime     @default(now())
   org        Org          @relation(fields: [org_id], references: [id])
   invitedBy  User         @relation("InvitedBy", fields: [invited_by], references: [id])
 
   @@index([org_id])
   @@index([email])
-  @@index([status]) 
+  @@index([status])
   @@index([expires_at])
   @@index([invited_by])
   @@index([org_id, email])
@@ -320,11 +322,50 @@ model OrgVaultKey {
 
 model PersonalVaultKey {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  user_id    String   @db.ObjectId
+  user_id    String   @unique @db.ObjectId
   ovk_cipher String
   created_at DateTime @default(now())
   vaults     Vault[]
 
-  @@index([user_id])
   @@index([created_at])
+}
+
+enum SubscriptionStatus {
+  active
+  cancelled
+  expired
+  suspended
+}
+
+model Subscription {
+  id                  String             @id @default(auto()) @map("_id") @db.ObjectId
+  vault_id            String             @db.ObjectId
+  user_id             String             @db.ObjectId
+  plan                String
+  status              SubscriptionStatus @default(active)
+  billing_cycle       String
+  amount              Float
+  currency            String
+  next_billing_date   DateTime?
+  last_payment_date   DateTime?
+  cancelled_at        DateTime?
+  will_downgrade_at   DateTime?
+  razorpay_order_id   String?
+  razorpay_payment_id String?
+  payment_method      String?
+  created_at          DateTime           @default(now())
+  updated_at          DateTime           @updatedAt
+
+  vault Vault @relation(fields: [vault_id], references: [id])
+  user  User  @relation(fields: [user_id], references: [id])
+
+  @@unique([vault_id, plan])
+  @@index([vault_id])
+  @@index([user_id])
+  @@index([status])
+  @@index([plan])
+  @@index([next_billing_date])
+  @@index([created_at])
+  @@index([vault_id, status])
+  @@index([user_id, status])
 }

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Database, AlertCircle, CheckCircle } from 'lucide-react';
+import { Database, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { Vault, User } from '@/types/vault';
 import { PlanType } from '@/types/billing';
+import { toast } from 'sonner';
 
-interface VaultStats {
-  itemCount: number;
-  vaultCount: number;
-  memberCount: number;
+interface UsageData {
+  passwords: { current: number; limit: number };
+  members: { current: number; limit: number };
+  storage: { current: number; limit: number };
+  twoFaEnabled: boolean;
 }
 
 interface VaultLimitsDisplayProps {
@@ -15,46 +17,35 @@ interface VaultLimitsDisplayProps {
 }
 
 export const VaultLimitsDisplay: React.FC<VaultLimitsDisplayProps> = ({ vault, user }) => {
-  const [stats, setStats] = useState<VaultStats>({
-    itemCount: 0,
-    vaultCount: 1,
-    memberCount: 1
-  });
+  const [usage, setUsage] = useState<UsageData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const userPlan: PlanType = 'free'; 
-
-  const getPlanLimits = (plan: PlanType, vaultType: 'personal' | 'org') => {
-    const limits = {
-      free: { vaults: 1, items: 5, members: 1 },
-      pro: { vaults: 10, items: 2000, members: 50 },
-      enterprise: { vaults: 999, items: 10000, members: 999 }
-    };
-
-    return limits[plan];
-  };
+  const userPlan: PlanType = 'free'; // TODO: Get from user data
 
   useEffect(() => {
-    const fetchStats = async (): Promise<void> => {
+    const fetchUsage = async (): Promise<void> => {
       try {
-        const response = await fetch(`/api/vault/${vault.id}/stats`);
-        if (response.ok) {
-          const data = await response.json();
-          setStats(data);
+        const response = await fetch(`/api/vault/${vault.id}/usage`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch usage data');
         }
-      } catch (error) {
-        console.error('Failed to fetch vault stats:', error);
+        
+        const data = await response.json();
+        setUsage(data);
+      } catch (error: any) {
+        console.error('Failed to fetch vault usage:', error);
+        toast.error(error.message || 'Failed to load usage data');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchStats();
+    fetchUsage();
   }, [vault.id]);
 
-  const limits = getPlanLimits(userPlan, vault.type);
-
   const getUsageColor = (used: number, limit: number): string => {
+    if (limit === -1 || limit === 0) return 'text-green-400';
     const percentage = (used / limit) * 100;
     if (percentage >= 90) return 'text-red-400';
     if (percentage >= 70) return 'text-yellow-400';
@@ -62,23 +53,38 @@ export const VaultLimitsDisplay: React.FC<VaultLimitsDisplayProps> = ({ vault, u
   };
 
   const getProgressColor = (used: number, limit: number): string => {
+    if (limit === -1 || limit === 0) return 'bg-blue-500';
     const percentage = (used / limit) * 100;
     if (percentage >= 90) return 'bg-red-500';
     if (percentage >= 70) return 'bg-yellow-500';
     return 'bg-blue-500';
   };
 
+  const calculatePercentage = (used: number, limit: number): number => {
+    if (limit === -1 || limit === 0) return 0;
+    return Math.min((used / limit) * 100, 100);
+  };
+
+  const formatLimit = (limit: number): string => {
+    if (limit === -1) return '∞';
+    return limit.toString();
+  };
+
   if (loading) {
     return (
       <div className="bg-gray-800/30 rounded-xl p-6 border border-gray-700/30">
-        <div className="animate-pulse space-y-4">
-          <div className="h-6 bg-gray-700/50 rounded w-1/4"></div>
-          <div className="space-y-3">
-            <div className="h-4 bg-gray-700/50 rounded"></div>
-            <div className="h-4 bg-gray-700/50 rounded"></div>
-            <div className="h-4 bg-gray-700/50 rounded"></div>
-          </div>
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          <span className="ml-3 text-gray-400">Loading usage data...</span>
         </div>
+      </div>
+    );
+  }
+
+  if (!usage) {
+    return (
+      <div className="bg-gray-800/30 rounded-xl p-6 border border-gray-700/30">
+        <p className="text-gray-400">Failed to load usage data</p>
       </div>
     );
   }
@@ -91,6 +97,7 @@ export const VaultLimitsDisplay: React.FC<VaultLimitsDisplayProps> = ({ vault, u
       </h3>
       
       <div className="space-y-6">
+        {/* Current Plan Badge */}
         <div className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
           <div>
             <p className="font-medium text-white">Current Plan</p>
@@ -99,64 +106,93 @@ export const VaultLimitsDisplay: React.FC<VaultLimitsDisplayProps> = ({ vault, u
           <div className={`px-3 py-1 rounded-full text-xs border ${
             userPlan === 'free' 
               ? 'bg-gray-900/30 text-gray-300 border-gray-700/30'
-              : 'bg-blue-900/30 text-blue-300 border-blue-700/30'
+              : userPlan === 'pro'
+              ? 'bg-blue-900/30 text-blue-300 border-blue-700/30'
+              : 'bg-purple-900/30 text-purple-300 border-purple-700/30'
           }`}>
-            {userPlan === 'free' ? 'Free' : 'Pro'}
+            {userPlan.toUpperCase()}
           </div>
         </div>
 
+        {/* Usage Bars */}
         <div className="space-y-4">
+          {/* Items/Passwords */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-gray-300">Vault Items</span>
-              <span className={`text-sm font-medium ${getUsageColor(stats.itemCount, limits.items)}`}>
-                {stats.itemCount} / {limits.items}
+              <span className={`text-sm font-medium ${getUsageColor(usage.passwords.current, usage.passwords.limit)}`}>
+                {usage.passwords.current} / {formatLimit(usage.passwords.limit)}
               </span>
             </div>
             <div className="w-full bg-gray-700/50 rounded-full h-2">
               <div
-                className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(stats.itemCount, limits.items)}`}
-                style={{ width: `${Math.min((stats.itemCount / limits.items) * 100, 100)}%` }}
-              ></div>
+                className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(usage.passwords.current, usage.passwords.limit)}`}
+                style={{ width: `${calculatePercentage(usage.passwords.current, usage.passwords.limit)}%` }}
+              />
             </div>
+            <p className="text-xs text-gray-500">
+              {calculatePercentage(usage.passwords.current, usage.passwords.limit).toFixed(1)}% used
+            </p>
           </div>
 
-          {vault.type === 'personal' && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-300">Total Vaults</span>
-                <span className={`text-sm font-medium ${getUsageColor(stats.vaultCount, limits.vaults)}`}>
-                  {stats.vaultCount} / {limits.vaults}
-                </span>
-              </div>
-              <div className="w-full bg-gray-700/50 rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(stats.vaultCount, limits.vaults)}`}
-                  style={{ width: `${Math.min((stats.vaultCount / limits.vaults) * 100, 100)}%` }}
-                ></div>
-              </div>
-            </div>
-          )}
-
+          {/* Members (org vaults only) */}
           {vault.type === 'org' && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-gray-300">Organization Members</span>
-                <span className={`text-sm font-medium ${getUsageColor(stats.memberCount, limits.members)}`}>
-                  {stats.memberCount} / {limits.members}
+                <span className={`text-sm font-medium ${getUsageColor(usage.members.current, usage.members.limit)}`}>
+                  {usage.members.current} / {formatLimit(usage.members.limit)}
                 </span>
               </div>
               <div className="w-full bg-gray-700/50 rounded-full h-2">
                 <div
-                  className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(stats.memberCount, limits.members)}`}
-                  style={{ width: `${Math.min((stats.memberCount / limits.members) * 100, 100)}%` }}
-                ></div>
+                  className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(usage.members.current, usage.members.limit)}`}
+                  style={{ width: `${calculatePercentage(usage.members.current, usage.members.limit)}%` }}
+                />
               </div>
+              <p className="text-xs text-gray-500">
+                {calculatePercentage(usage.members.current, usage.members.limit).toFixed(1)}% used
+              </p>
             </div>
           )}
+
+          {/* Storage */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-300">Storage</span>
+              <span className={`text-sm font-medium ${getUsageColor(usage.storage.current, usage.storage.limit)}`}>
+                {(usage.storage.current / 1024 / 1024).toFixed(2)} MB / 
+                {usage.storage.limit === -1 ? ' ∞' : ` ${(usage.storage.limit / 1024 / 1024).toFixed(0)} MB`}
+              </span>
+            </div>
+            <div className="w-full bg-gray-700/50 rounded-full h-2">
+              <div
+                className={`h-2 rounded-full transition-all duration-300 ${getProgressColor(usage.storage.current, usage.storage.limit)}`}
+                style={{ width: `${calculatePercentage(usage.storage.current, usage.storage.limit)}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-500">
+              {calculatePercentage(usage.storage.current, usage.storage.limit).toFixed(1)}% used
+            </p>
+          </div>
+
+          {/* 2FA Status */}
+          <div className="pt-4 border-t border-gray-700/30">
+            <div className="flex items-center justify-between p-3 bg-gray-700/30 rounded-lg">
+              <span className="text-sm font-medium text-gray-300">Two-Factor Authentication</span>
+              <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                usage.twoFaEnabled
+                  ? 'bg-green-900/30 text-green-300 border border-green-700/30'
+                  : 'bg-red-900/30 text-red-300 border border-red-700/30'
+              }`}>
+                {usage.twoFaEnabled ? 'Enabled' : 'Disabled'}
+              </div>
+            </div>
+          </div>
         </div>
 
-        {(stats.itemCount / limits.items) >= 0.9 && (
+        {/* Warnings */}
+        {usage.passwords.limit > 0 && (usage.passwords.current / usage.passwords.limit) >= 0.9 && (
           <div className="flex items-start gap-3 p-3 bg-red-900/20 border border-red-700/30 rounded-lg">
             <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
             <div>
@@ -174,7 +210,7 @@ export const VaultLimitsDisplay: React.FC<VaultLimitsDisplayProps> = ({ vault, u
             <div>
               <p className="text-blue-300 font-medium">Free Plan Limits</p>
               <p className="text-sm text-blue-200">
-                Upgrade to Pro to get unlimited items, multiple vaults, and advanced features.
+                Upgrade to Pro to get more storage, unlimited items, and advanced features.
               </p>
             </div>
           </div>

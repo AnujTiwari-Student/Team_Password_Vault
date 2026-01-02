@@ -1,7 +1,6 @@
 import { prisma } from '@/db';
 import { currentUser } from '@/lib/current-user';
 import { NextRequest, NextResponse } from 'next/server';
-import { isAdmin } from '@/utils/permission-utils';
 
 interface CreateOrgRequest {
   name: string;
@@ -19,23 +18,10 @@ export async function POST(req: NextRequest) {
       }, { status: 401 });
     }
 
-    const userData = await prisma.user.findUnique({
-      where: { id: user.id },
-      include: {
-        org: true,
-        member: true
-      }
-    });
-
-    if (!isAdmin(userData)) {
-      return NextResponse.json({ 
-        error: 'Forbidden',
-        message: 'Only administrators can create organizations'
-      }, { status: 403 });
-    }
+    const userId = user.id;
 
     const body: CreateOrgRequest = await req.json();
-    const { name, description } = body;
+    const { name } = body;
 
     if (!name || name.trim().length === 0) {
       return NextResponse.json({ 
@@ -51,7 +37,7 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    const existingOrg = await prisma.organization.findFirst({
+    const existingOrg = await prisma.org.findFirst({
       where: {
         name: {
           equals: name,
@@ -68,33 +54,50 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await prisma.$transaction(async (tx) => {
+      const organization = await tx.org.create({
+        data: {
+          name: name.trim(),
+          owner_user_id: userId,
+        }
+      });
+
+      const orgVaultKey = await tx.orgVaultKey.create({
+        data: {
+          org_id: organization.id,
+          ovk_cipher: '',
+        }
+      });
+
       const vault = await tx.vault.create({
         data: {
           name: `${name} Vault`,
           type: 'org',
+          org_id: organization.id,
+          ovk_id: orgVaultKey.id,
+          orgVaultKeyId: orgVaultKey.id,
         }
-      });
-
-      const organization = await tx.organization.create({
-        data: {
-          name: name.trim(),
-          description: description?.trim(),
-          owner_user_id: user.id,
-          vault_id: vault.id,
-        }
-      });
-
-      await tx.vault.update({
-        where: { id: vault.id },
-        data: { org_id: organization.id }
       });
 
       await tx.membership.create({
         data: {
-          user_id: user.id,
+          user_id: userId,
           org_id: organization.id,
           role: 'owner',
           ovk_wrapped_for_user: '',
+        }
+      });
+
+      await tx.logs.create({
+        data: {
+          user_id: userId,
+          action: 'ORG_CREATED',
+          subject_type: 'org',
+          ts: new Date(),
+          meta: {
+            org_id: organization.id,
+            org_name: organization.name,
+            vault_id: vault.id,
+          }
         }
       });
 

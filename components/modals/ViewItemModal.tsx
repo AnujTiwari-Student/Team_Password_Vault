@@ -53,7 +53,7 @@ export const ViewItemModal: React.FC<ViewItemModalProps> = ({
   const { umkCryptoKey, privateKeyBase64 } = useUserMasterKey(masterPassphrase);
   const { ovkCryptoKey } = useVaultOVK(
     umkCryptoKey,
-    vaultId,
+    vaultId as string,
     vaultType,
     privateKeyBase64,
     orgId
@@ -97,7 +97,7 @@ export const ViewItemModal: React.FC<ViewItemModalProps> = ({
       console.log('✅ Passphrase received, setting up decryption...');
       setMasterPassphrase(passphrase);
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Passphrase verification error:', error);
       throw error;
     }

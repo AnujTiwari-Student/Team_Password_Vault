@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useState, useEffect } from "react";
-import { ChevronsUpDown, Plus, Building2 } from "lucide-react";
+import { ChevronsUpDown, Plus, Building2, Crown } from "lucide-react";
 import axios from "axios";
 
 import {
@@ -56,10 +56,62 @@ export function TeamSwitcher() {
   const [activeOrg, setActiveOrg] = useState<Organization | null>(null);
   const [isLoadingOrgs, setIsLoadingOrgs] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState<string>('free');
+  const [isLoadingPlan, setIsLoadingPlan] = useState(false);
+  const [currentVaultId, setCurrentVaultId] = useState<string | null>(null);
 
   const canUserCreateOrg = React.useMemo(() => {
     return canCreateOrg(user);
   }, [user]);
+
+  useEffect(() => {
+    const fetchVaultForOrg = async (orgId: string) => {
+      try {
+        const response = await axios.get(`/api/org/${orgId}/vault`);
+        if (response.data.success && response.data.vault) {
+          setCurrentVaultId(response.data.vault.id);
+          return response.data.vault.id;
+        }
+      } catch (error) {
+        console.error('Failed to fetch org vault:', error);
+      }
+      return null;
+    };
+
+    const fetchCurrentPlan = async () => {
+      let vaultId = null;
+
+      if (activeOrg?.id) {
+        vaultId = await fetchVaultForOrg(activeOrg.id);
+      } else if (user?.vault?.id) {
+        vaultId = user.vault.id;
+        setCurrentVaultId(vaultId);
+      }
+
+      if (!vaultId) {
+        setCurrentPlan('free');
+        return;
+      }
+
+      try {
+        setIsLoadingPlan(true);
+        const response = await fetch(`/api/vault/${vaultId}/billing`);
+        if (response.ok) {
+          const data = await response.json();
+          setCurrentPlan(data.plan || 'free');
+        } else {
+          setCurrentPlan('free');
+        }
+      } catch (error) {
+        console.error('Failed to fetch plan:', error);
+        setCurrentPlan('free');
+      } finally {
+        setIsLoadingPlan(false);
+      }
+    };
+
+    fetchCurrentPlan();
+  }, [user?.vault?.id, activeOrg?.id]);
 
   useEffect(() => {
     const orgIdFromUrl = searchParams.get('org');
@@ -165,6 +217,7 @@ export function TeamSwitcher() {
   const handlePersonalWorkspace = (): void => {
     setActiveOrg(null);
     updateUrlWithOrg(null);
+    setCurrentVaultId(user?.vault?.id || null);
     
     window.dispatchEvent(new CustomEvent('organizationChanged', { 
       detail: { 
@@ -190,7 +243,7 @@ export function TeamSwitcher() {
 
   const hasOrganizations = organizations.length > 0;
   const displayName = activeOrg?.name ? `${activeOrg.name}` : `${user.name} (Personal Workspace)`;
-  const displayPlan = 'Free Plan';
+  const displayPlan = isLoadingPlan ? 'Loading...' : currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1) + ' Plan';
   const isPersonalWorkspace = activeOrg === null;
 
   return (
@@ -214,8 +267,10 @@ export function TeamSwitcher() {
                   <span className="truncate font-medium text-white">
                     {displayName}
                   </span>
-                  <span className="truncate text-xs text-gray-400">
-                    {activeOrg ? `${activeOrg.role} • ${displayPlan}` : displayPlan}
+                  <span className="truncate text-xs text-gray-400 flex items-center gap-1">
+                    {activeOrg && `${activeOrg.role} • `}
+                    {currentPlan !== 'free' && <Crown className="w-3 h-3 text-yellow-400" />}
+                    {displayPlan}
                   </span>
                 </div>
                 {isLoadingOrgs ? (

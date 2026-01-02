@@ -1,9 +1,9 @@
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import React, { useState } from 'react'
 import { User } from '@/types/vault';
-import { Settings, CreditCard, Users, Database } from 'lucide-react';
+import { Settings, CreditCard, Database } from 'lucide-react';
 import { VaultNameEditor } from '../settings/VaultNameEditor';
-import { VaultTypeConverter } from '../settings/VaultTypeConverter';
+// import { VaultTypeConverter } from '../settings/VaultTypeConverter';
 import { BillingComponent } from '../settings/BillingComponent';
 import { VaultLimitsDisplay } from '../settings/VaultLimitDisplay';
 
@@ -80,7 +80,7 @@ function VaultSetting() {
             <Database className="w-4 h-4" />
             <span className="text-sm md:text-base">Usage</span>
           </button>
-          {vault.type === 'org' && (
+          {/* {vault.type === 'org' && (
             <button
               onClick={() => setActiveTab('members')}
               className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-lg transition-colors whitespace-nowrap ${
@@ -92,14 +92,14 @@ function VaultSetting() {
               <Users className="w-4 h-4" />
               <span className="text-sm md:text-base">Members</span>
             </button>
-          )}
+          )} */}
         </div>
 
         <div className="space-y-4 md:space-y-6">
           {activeTab === 'general' && (
             <div className="space-y-4 md:space-y-6">
               <VaultNameEditor vault={vault} />
-              <VaultTypeConverter vault={vault} user={user} />
+              {/* <VaultTypeConverter vault={vault} user={user} /> */}
             </div>
           )}
 
@@ -111,12 +111,12 @@ function VaultSetting() {
             <VaultLimitsDisplay user={user} vault={vault} />
           )}
 
-          {activeTab === 'members' && vault.type === 'org' && (
+          {/* {activeTab === 'members' && vault.type === 'org' && (
             <div className="bg-gray-800/30 rounded-xl p-4 md:p-6 border border-gray-700/30">
               <h3 className="text-lg md:text-xl font-semibold mb-4">Organization Members</h3>
               <p className="text-gray-400 text-sm md:text-base">Member management coming soon...</p>
             </div>
-          )}
+          )} */}
         </div>
       </div>
     </div>

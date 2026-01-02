@@ -50,9 +50,9 @@ export const MasterPassphraseModal: React.FC<MasterPassphraseModalProps> = ({
       } else {
         toast.error('Invalid master passphrase');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Passphrase verification error:', error);
-      toast.error(error.message || 'Failed to verify passphrase');
+      toast.error('Failed to verify passphrase');
     } finally {
       setLoading(false);
     }

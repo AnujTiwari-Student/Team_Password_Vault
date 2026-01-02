@@ -109,10 +109,6 @@ export function AppSidebar({
             title: "Active",
             url: "#",
           },
-          {
-            title: "Archived",
-            url: "#",
-          },
         ],
       },
     ],

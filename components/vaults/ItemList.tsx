@@ -30,14 +30,16 @@ import {
 import { toast } from "sonner";
 import { canUserEdit } from "@/utils/permission-utils";
 import { APIVaultItem } from "@/types/vault";
+import { ExtendedUser, MemberWithOrg } from "@/types/user";
 import { ViewItemModal } from "@/components/modals/ViewItemModal";
 import AddingItemsModal from "../modals/AddingItems";
 
 type VaultType = "personal" | "org";
 type ItemType = "login" | "note" | "totp";
+type UserRole = "owner" | "admin" | "member" | "viewer";
 
 export const UnifiedVaultList: React.FC = () => {
-  const user = useCurrentUser();
+  const user = useCurrentUser() as ExtendedUser | null;
   const searchParams = useSearchParams();
   const orgIdFromUrl = searchParams.get("org");
 
@@ -52,13 +54,12 @@ export const UnifiedVaultList: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [orgVaultId, setOrgVaultId] = useState<string | null>(null);
   const [isFetching, setIsFetching] = useState(false);
-  const [fetchedRole, setFetchedRole] = useState<string | null>(null);
+  const [fetchedRole, setFetchedRole] = useState<UserRole | null>(null);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<APIVaultItem | null>(null);
 
-  // Log user structure
   useEffect(() => {
     if (user) {
       console.log('👤 USER OBJECT:', JSON.stringify(user, null, 2));
@@ -66,13 +67,11 @@ export const UnifiedVaultList: React.FC = () => {
   }, [user]);
 
   const hasOrgAccess = useMemo(() => {
-    // Check if user owns org
     if (user?.org?.id) {
       console.log('✅ User owns org:', user.org.id);
       return true;
     }
     
-    // Check if user has memberships
     if (user?.member) {
       console.log('✅ User has member data');
       return true;
@@ -120,13 +119,11 @@ export const UnifiedVaultList: React.FC = () => {
         return orgIdFromUrl;
       }
       
-      // Check if user owns an org
       if (user?.org?.id) {
         console.log('🔍 Using owned org:', user.org.id);
         return user.org.id;
       }
       
-      // Check member data
       if (user?.member) {
         const members = Array.isArray(user.member) ? user.member : [user.member];
         const orgId = members[0]?.org_id;
@@ -150,14 +147,17 @@ export const UnifiedVaultList: React.FC = () => {
             setOrgVaultId(response.data.vault.id);
             console.log('✅ Org vault ID fetched:', response.data.vault.id);
             
-            // Get role from response
             if (response.data.membership?.role) {
-              setFetchedRole(response.data.membership.role);
+              setFetchedRole(response.data.membership.role as UserRole);
               console.log('✅ Role fetched:', response.data.membership.role);
             }
           }
-        } catch (error: any) {
-          console.error("❌ Failed to fetch org vault:", error);
+        } catch (error) {
+          if (axios.isAxiosError(error)) {
+            console.error("❌ Failed to fetch org vault:", error.response?.data || error.message);
+          } else {
+            console.error("❌ Failed to fetch org vault:", error);
+          }
         }
       }
     };
@@ -176,7 +176,6 @@ export const UnifiedVaultList: React.FC = () => {
         return orgVaultId;
       }
 
-      // Check user.org.vault_id for org owners
       if (user?.org?.vault_id) {
         console.log('🔍 Org vault ID (from user.org):', user.org.vault_id);
         return user.org.vault_id;
@@ -187,35 +186,31 @@ export const UnifiedVaultList: React.FC = () => {
     }
   }, [vaultType, user, orgVaultId]);
 
-  const userRole = useMemo(() => {
+  const userRole = useMemo((): UserRole | null => {
     if (vaultType === "personal") {
       console.log('🔍 Personal vault role: owner');
       return "owner";
     }
     
-    // Use fetched role first
     if (fetchedRole) {
       console.log('🔍 Using fetched role:', fetchedRole);
       return fetchedRole;
     }
     
-    // Check if user is org owner
     if (user?.org?.id === currentOrgId && user?.org?.owner_user_id === user?.id) {
       console.log('🔍 Org role: owner (owns org)');
       return "owner";
     }
     
-    // Check member data
     if (user?.member) {
       const members = Array.isArray(user.member) ? user.member : [user.member];
-      const member = members.find(m => m.org_id === currentOrgId);
-      const role = member?.role || null;
+      const member = members.find((m: MemberWithOrg) => m.org_id === currentOrgId);
+      const role = member?.role as UserRole | undefined;
       console.log('🔍 Org role (from member):', role);
-      return role;
+      return role || null;
     }
     
     console.log('❌ No role found, defaulting to owner for org account');
-    // If user has org account type, assume owner
     if (user?.account_type === 'org' && user?.org?.id === currentOrgId) {
       return 'owner';
     }
@@ -224,7 +219,7 @@ export const UnifiedVaultList: React.FC = () => {
   }, [vaultType, user, currentOrgId, fetchedRole]);
 
   const canEdit = useMemo(() => {
-    const result = userRole ? canUserEdit(userRole as any) : false;
+    const result = userRole ? canUserEdit(userRole) : false;
     console.log('🔍 Can edit:', result, 'Role:', userRole);
     return result;
   }, [userRole]);
@@ -266,24 +261,25 @@ export const UnifiedVaultList: React.FC = () => {
       setItems(response.data.items || []);
       setError(null);
       
-      // Update role from response if available
       if (response.data.user_role && !fetchedRole) {
         console.log('✅ Got role from items API:', response.data.user_role);
-        setFetchedRole(response.data.user_role);
+        setFetchedRole(response.data.user_role as UserRole);
       }
       
       console.log("✅ Items loaded:", response.data.items?.length || 0);
-    } catch (error: any) {
+    } catch (error) {
       console.error("❌ Failed to fetch items:", error);
 
       let errorMessage = "Failed to load vault items";
 
-      if (error.response?.status === 400) {
-        errorMessage = error.response?.data?.message || "Invalid request.";
-      } else if (error.response?.status === 403) {
-        errorMessage = error.response?.data?.message || "Access denied";
-      } else if (error.response?.status === 404) {
-        errorMessage = error.response?.data?.message || "Vault not found";
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 400) {
+          errorMessage = error.response?.data?.message || "Invalid request.";
+        } else if (error.response?.status === 403) {
+          errorMessage = error.response?.data?.message || "Access denied";
+        } else if (error.response?.status === 404) {
+          errorMessage = error.response?.data?.message || "Vault not found";
+        }
       }
 
       setError(errorMessage);
@@ -390,7 +386,7 @@ export const UnifiedVaultList: React.FC = () => {
     
     if (user?.member) {
       const members = Array.isArray(user.member) ? user.member : [user.member];
-      const member = members.find(m => m.org_id === currentOrgId);
+      const member = members.find((m: MemberWithOrg) => m.org_id === currentOrgId);
       if (member?.org?.name) return member.org.name;
     }
     
@@ -410,26 +406,6 @@ export const UnifiedVaultList: React.FC = () => {
 
   return (
     <div className="space-y-6 p-6">
-      {/* Debug Panel */}
-      {/* {process.env.NODE_ENV === 'development' && (
-        <div className="bg-yellow-900/20 border-2 border-yellow-700/50 rounded-xl p-4 text-xs font-mono">
-          <div className="font-bold text-yellow-300 mb-2">DEBUG INFO:</div>
-          <div className="space-y-1 text-yellow-200">
-            <div>Vault Type: {vaultType}</div>
-            <div>Org ID: {currentOrgId || 'null'}</div>
-            <div>Vault ID: {vaultId || 'null'}</div>
-            <div>User Role: {userRole || 'null'}</div>
-            <div>Fetched Role: {fetchedRole || 'null'}</div>
-            <div>Can Edit: {canEdit ? 'YES' : 'NO'}</div>
-            <div>Loading: {loading ? 'YES' : 'NO'}</div>
-            <div>Has user.org: {user?.org ? 'YES' : 'NO'}</div>
-            <div>Has user.member: {user?.member ? 'YES' : 'NO'}</div>
-            <div>Account Type: {user?.account_type || 'null'}</div>
-          </div>
-        </div>
-      )} */}
-
-      {/* Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-gray-700/50">
         {showVaultSelector ? (
           <Select value={vaultType} onValueChange={handleVaultTypeChange}>
@@ -542,8 +518,6 @@ export const UnifiedVaultList: React.FC = () => {
         </button>
       </div>
 
-      {/* Rest of component stays the same... */}
-      {/* Title Section */}
       <div className="flex items-center gap-4">
         <div
           className={`p-3 rounded-xl ${
@@ -575,7 +549,6 @@ export const UnifiedVaultList: React.FC = () => {
         </div>
       </div>
 
-      {/* Search and Controls */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -640,7 +613,6 @@ export const UnifiedVaultList: React.FC = () => {
         </div>
       </div>
 
-      {/* Filters Panel */}
       {showFilters && (
         <div className="bg-gray-800/30 backdrop-blur-sm border-2 border-gray-700/50 rounded-xl p-6 shadow-xl">
           <div className="flex items-center justify-between mb-6">
@@ -711,7 +683,6 @@ export const UnifiedVaultList: React.FC = () => {
         </div>
       )}
 
-      {/* Error State */}
       {error && !isFetching && (
         <div className="bg-red-900/20 border-2 border-red-700/50 rounded-xl p-5 flex items-start gap-4 shadow-lg">
           <div className="p-2 bg-red-500/20 rounded-lg flex-shrink-0">
@@ -726,7 +697,6 @@ export const UnifiedVaultList: React.FC = () => {
         </div>
       )}
 
-      {/* Loading State */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="text-center">
@@ -842,7 +812,6 @@ export const UnifiedVaultList: React.FC = () => {
         </div>
       )}
 
-      {/* Modals */}
       {vaultId && (
         <AddingItemsModal
           isOpen={showAddModal}

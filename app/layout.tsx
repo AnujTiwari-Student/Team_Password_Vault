@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-// @ts-expect-error Server Component
+// @ts-expect-error ignore-next-line
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { SessionProvider } from "next-auth/react";
 import { auth } from "@/lib/auth";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { VaultProvider } from "@/context/active-vault-context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,27 +25,23 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
-
+}) {
   const session = await auth();
 
   return (
-    <SessionProvider session={session} >
-      <html lang="en" className="hydrated">
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        >
-          <SidebarProvider className="bg-gray-900">
-            <main className="w-max flex-1">
-              {children}
-            </main>
-            <Toaster />
-          </SidebarProvider>
-          <Toaster />
-        </body>
-      </html>
-    </SessionProvider>
+    <html lang="en">
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <SessionProvider session={session}>
+          <VaultProvider>
+            <SidebarProvider className="bg-gray-900">
+              <main className="w-max flex-1">{children}</main>
+              <Toaster />
+            </SidebarProvider>
+          </VaultProvider>
+        </SessionProvider>
+      </body>
+    </html>
   );
 }

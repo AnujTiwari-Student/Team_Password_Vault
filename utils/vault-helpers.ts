@@ -46,12 +46,22 @@ export function validateUrl(url: string): boolean {
   }
 }
 
+export interface Membership {
+  org_id: string;
+  role: MemberRole;
+  [key: string]: unknown;
+}
+
+export interface UserWithMemberships {
+  member?: Membership | Membership[];
+}
+
 export function getMembershipForOrg(
-  user: { member?: any | any[] },
+  user: UserWithMemberships,
   orgId: string
-) {
+): Membership | null {
   if (!user.member) return null;
   
   const memberships = Array.isArray(user.member) ? user.member : [user.member];
-  return memberships.find((m: any) => m.org_id === orgId) || null;
+  return memberships.find((m) => m.org_id === orgId) || null;
 }
