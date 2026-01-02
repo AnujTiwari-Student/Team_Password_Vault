@@ -80,7 +80,7 @@ export async function checkTOTPConfigured(userId: string): Promise<boolean> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { totp_secret: true },
-    });u
+    });
 
     return !!user?.totp_secret;
   } catch (error) {
