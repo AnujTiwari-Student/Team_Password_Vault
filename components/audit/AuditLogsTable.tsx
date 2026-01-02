@@ -177,7 +177,7 @@ export const AuditLogsTable: React.FC = () => {
     if (isUserLoaded) {
       fetchLogs();
     }
-  }, [isUserLoaded]);
+  }, [isUserLoaded, fetchLogs]);
 
   useEffect(() => {
     const hasEmptyFilters = Object.values(filters).every(value => value === '');

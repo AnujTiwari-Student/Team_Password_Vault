@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 
 interface RecentActivity {
   id: string;
@@ -36,7 +35,6 @@ interface DashboardStats {
 
 export const DashboardOverview: React.FC = () => {
   const user = useCurrentUser();
-  const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
@@ -284,7 +282,7 @@ export const DashboardOverview: React.FC = () => {
           ) : (
             <>
               <div className="space-y-3">
-                {currentActivities.map((activity, index) => (
+                {currentActivities.map((activity) => (
                   <div
                     key={activity.id}
                     className="group relative bg-gray-750 hover:bg-gray-700/70 border border-gray-700/50 hover:border-gray-600 rounded-lg transition-all duration-200"
