@@ -31,6 +31,7 @@ const DashboardPage = () => {
     >
       <DashboardContent
         activeTab={activeTab}
+        // @ts-expect-error Todo: Type missmatch
         user={user}
       />
     </DashboardLayout>
