@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { orgId: string } }
+  context: { params: Promise<{ orgId: string }> }
 ) {
   try {
     const user = await currentUser();
@@ -12,11 +12,11 @@ export async function GET(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
+    const params = await context.params;
     const { orgId } = params;
 
     console.log('🔐 [/api/vaults/org/[orgId]] Called:', { orgId, userId: user.id });
 
-    // Check if user is member of this org
     const membership = await prisma.membership.findFirst({
       where: {
         user_id: user.id,
@@ -32,7 +32,6 @@ export async function GET(
       }, { status: 403 });
     }
 
-    // Get org vault
     const vault = await prisma.vault.findFirst({
       where: {
         org_id: orgId,
