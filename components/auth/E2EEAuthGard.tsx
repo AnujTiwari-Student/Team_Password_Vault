@@ -27,7 +27,7 @@ export default function E2EEAuthGuard({ children }: { children: React.ReactNode 
       router.replace("/dashboard");
       return;
     }
-  }, [session, status, router, pathname]);
+  }, [session, status, router, pathname, user]);
 
   if (status === "loading" || (session?.user && !session.user.masterPassphraseSetupComplete && pathname !== SETUP_PATH)) {
     return <div className="min-h-screen flex items-center justify-center">Loading Secure Session...</div>;

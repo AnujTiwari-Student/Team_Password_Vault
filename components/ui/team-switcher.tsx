@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ChevronsUpDown, Plus, Building2, Crown } from "lucide-react";
 import axios from "axios";
 
@@ -58,26 +58,64 @@ export function TeamSwitcher() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<string>('free');
   const [isLoadingPlan, setIsLoadingPlan] = useState(false);
-  const [currentVaultId, setCurrentVaultId] = useState<string | null>(null);
 
   const canUserCreateOrg = React.useMemo(() => {
     return canCreateOrg(user);
   }, [user]);
 
-  useEffect(() => {
-    const fetchVaultForOrg = async (orgId: string) => {
-      try {
-        const response = await axios.get(`/api/org/${orgId}/vault`);
-        if (response.data.success && response.data.vault) {
-          setCurrentVaultId(response.data.vault.id);
-          return response.data.vault.id;
-        }
-      } catch (error) {
-        console.error('Failed to fetch org vault:', error);
-      }
-      return null;
-    };
+  const updateUrlWithOrg = useCallback((orgId: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    
+    if (orgId) {
+      params.set('org', orgId);
+    } else {
+      params.delete('org');
+    }
+    
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    router.push(newUrl, { scroll: false });
+  }, [searchParams, router]);
 
+  const fetchOrganizations = useCallback(async (): Promise<void> => {
+    try {
+      setIsLoadingOrgs(true);
+      const response = await axios.get('/api/orgs/data', {
+        params: { userId: user?.id }
+      });
+      
+      if (response.data.success) {
+        const orgs = response.data.data.organizations || [];
+        setOrganizations(orgs);
+        
+        if (!activeOrg && !searchParams.get('org')) {
+          const currentOrg = orgs.find((org: Organization) => org.id === user?.org?.id) || orgs[0];
+          if (currentOrg) {
+            setActiveOrg(currentOrg);
+            updateUrlWithOrg(currentOrg.id);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch organizations:', error);
+      setOrganizations([]);
+    } finally {
+      setIsLoadingOrgs(false);
+    }
+  }, [user?.id, user?.org?.id, activeOrg, searchParams, updateUrlWithOrg]);
+
+  const fetchVaultForOrg = useCallback(async (orgId: string) => {
+    try {
+      const response = await axios.get(`/api/org/${orgId}/vault`);
+      if (response.data.success && response.data.vault) {
+        return response.data.vault.id;
+      }
+    } catch (error) {
+      console.error('Failed to fetch org vault:', error);
+    }
+    return null;
+  }, []);
+
+  useEffect(() => {
     const fetchCurrentPlan = async () => {
       let vaultId = null;
 
@@ -85,7 +123,6 @@ export function TeamSwitcher() {
         vaultId = await fetchVaultForOrg(activeOrg.id);
       } else if (user?.vault?.id) {
         vaultId = user.vault.id;
-        setCurrentVaultId(vaultId);
       }
 
       if (!vaultId) {
@@ -111,7 +148,7 @@ export function TeamSwitcher() {
     };
 
     fetchCurrentPlan();
-  }, [user?.vault?.id, activeOrg?.id]);
+  }, [user?.vault?.id, activeOrg?.id, fetchVaultForOrg]);
 
   useEffect(() => {
     const orgIdFromUrl = searchParams.get('org');
@@ -123,7 +160,7 @@ export function TeamSwitcher() {
     } else if (!orgIdFromUrl && activeOrg) {
       setActiveOrg(null);
     }
-  }, [searchParams, organizations, activeOrg?.id]);
+  }, [searchParams, organizations, activeOrg?.id, activeOrg]);
 
   useEffect(() => {
     if (!user) {
@@ -145,47 +182,7 @@ export function TeamSwitcher() {
     if (user?.id) {
       fetchOrganizations();
     }
-  }, [user?.id]);
-
-  const fetchOrganizations = async (): Promise<void> => {
-    try {
-      setIsLoadingOrgs(true);
-      const response = await axios.get('/api/orgs/data', {
-        params: { userId: user?.id }
-      });
-      
-      if (response.data.success) {
-        const orgs = response.data.data.organizations || [];
-        setOrganizations(orgs);
-        
-        if (!activeOrg && !searchParams.get('org')) {
-          const currentOrg = orgs.find((org: Organization) => org.id === user?.org?.id) || orgs[0];
-          if (currentOrg) {
-            setActiveOrg(currentOrg);
-            updateUrlWithOrg(currentOrg.id);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch organizations:', error);
-      setOrganizations([]);
-    } finally {
-      setIsLoadingOrgs(false);
-    }
-  };
-
-  const updateUrlWithOrg = (orgId: string | null) => {
-    const params = new URLSearchParams(searchParams.toString());
-    
-    if (orgId) {
-      params.set('org', orgId);
-    } else {
-      params.delete('org');
-    }
-    
-    const newUrl = `${window.location.pathname}?${params.toString()}`;
-    router.push(newUrl, { scroll: false });
-  };
+  }, [user?.id, fetchOrganizations]);
 
   const handleCreateOrg = (): void => {
     if (!canUserCreateOrg) {
@@ -217,7 +214,6 @@ export function TeamSwitcher() {
   const handlePersonalWorkspace = (): void => {
     setActiveOrg(null);
     updateUrlWithOrg(null);
-    setCurrentVaultId(user?.vault?.id || null);
     
     window.dispatchEvent(new CustomEvent('organizationChanged', { 
       detail: { 

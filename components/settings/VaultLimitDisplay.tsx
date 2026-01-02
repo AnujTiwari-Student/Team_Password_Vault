@@ -16,7 +16,7 @@ interface VaultLimitsDisplayProps {
   user: User;
 }
 
-export const VaultLimitsDisplay: React.FC<VaultLimitsDisplayProps> = ({ vault, user }) => {
+export const VaultLimitsDisplay: React.FC<VaultLimitsDisplayProps> = ({ vault }) => {
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -33,9 +33,9 @@ export const VaultLimitsDisplay: React.FC<VaultLimitsDisplayProps> = ({ vault, u
         
         const data = await response.json();
         setUsage(data);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Failed to fetch vault usage:', error);
-        toast.error(error.message || 'Failed to load usage data');
+        toast.error('Failed to load usage data');
       } finally {
         setLoading(false);
       }

@@ -1,11 +1,12 @@
 import { prisma } from "@/db";
 import { NextResponse } from "next/server";
 import { currentUser } from "@/lib/current-user";
+import { Prisma, AuditSubjectType } from "@prisma/client";
 
 export async function GET(request: Request) {
   try {
     const user = await currentUser();
-    
+
     if (!user) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
@@ -14,8 +15,9 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+
+    const page = Number(searchParams.get("page") ?? 1);
+    const limit = Number(searchParams.get("limit") ?? 20);
     const action = searchParams.get("action");
     const subject_type = searchParams.get("subject_type");
     const start_date = searchParams.get("start_date");
@@ -24,9 +26,9 @@ export async function GET(request: Request) {
 
     const skip = (page - 1) * limit;
 
-    const whereClause: any = {};
+    const whereClause: Prisma.AuditWhereInput = {};
 
-    if (user.account_type === 'org' && user.org) {
+    if (user.account_type === "org" && user.org) {
       whereClause.org_id = user.org.id;
     } else {
       whereClause.actor_user_id = user.id;
@@ -40,18 +42,20 @@ export async function GET(request: Request) {
       whereClause.action = action;
     }
 
-    if (subject_type) {
-      whereClause.subject_type = subject_type;
+    if (
+      subject_type &&
+      Object.values(AuditSubjectType).includes(
+        subject_type as AuditSubjectType
+      )
+    ) {
+      whereClause.subject_type = subject_type as AuditSubjectType;
     }
 
     if (start_date || end_date) {
-      whereClause.ts = {};
-      if (start_date) {
-        whereClause.ts.gte = new Date(start_date);
-      }
-      if (end_date) {
-        whereClause.ts.lte = new Date(end_date);
-      }
+      whereClause.ts = {
+        ...(start_date && { gte: new Date(start_date) }),
+        ...(end_date && { lte: new Date(end_date) }),
+      };
     }
 
     const [audits, totalCount] = await Promise.all([
@@ -65,9 +69,7 @@ export async function GET(request: Request) {
         skip,
         take: limit,
       }),
-      prisma.audit.count({
-        where: whereClause
-      })
+      prisma.audit.count({ where: whereClause }),
     ]);
 
     const totalPages = Math.ceil(totalCount / limit);
@@ -75,7 +77,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       data: {
-        audits: audits,
+        audits,
         pagination: {
           page,
           limit,
@@ -83,10 +85,9 @@ export async function GET(request: Request) {
           totalPages,
           hasNextPage: page < totalPages,
           hasPreviousPage: page > 1,
-        }
-      }
+        },
+      },
     });
-
   } catch (error) {
     console.error("Error fetching audits:", error);
     return NextResponse.json(

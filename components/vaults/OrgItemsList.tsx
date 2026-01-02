@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Search, Filter, Grid, List, Key, Users, Building, Lock, Edit } from "lucide-react";
-import { copyToClipboard } from "@/utils/handle-copy";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useRouter } from "next/navigation";
 import { EnhancedItemDrawer } from "../drawer/EnhancedItemDrawer";
@@ -23,7 +22,7 @@ const useOrgItems = (searchTerm: string, typeFilter: string, tagFilter: string) 
     org_id: string;
   } | null>(null);
 
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -53,11 +52,11 @@ const useOrgItems = (searchTerm: string, typeFilter: string, tagFilter: string) 
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, typeFilter, tagFilter]);
 
   useEffect(() => {
     fetchItems();
-  }, [searchTerm, typeFilter, tagFilter]);
+  }, [fetchItems]);
 
   return { loading, items, error, vaultInfo, refetch: fetchItems };
 };
@@ -66,7 +65,6 @@ export const OrgItemsList: React.FC = () => {
   const router = useRouter();
   const user = useCurrentUser() as User | null;
 
-  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [isItemDrawerOpen, setIsItemDrawerOpen] = useState<boolean>(false);
   const [selectedItem, setSelectedItem] = useState<APIVaultItem | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
@@ -85,12 +83,14 @@ export const OrgItemsList: React.FC = () => {
   const { umkCryptoKey, privateKeyBase64 } = useUserMasterKey(mnemonic || null);
   const { loading, items, error, vaultInfo, refetch } = useOrgItems(searchTerm, typeFilter, tagFilter);
   
-  const ovkCryptoKey = useVaultOVK(
+  const ovkResult = useVaultOVK(
     umkCryptoKey,
     vaultInfo?.vault_id || null,
     'org',
     privateKeyBase64
   );
+
+  const ovkCryptoKey = ovkResult?.ovkCryptoKey || null;
   const { decryptItem, getDecryptedItem, isDecrypting } = useDecryption(ovkCryptoKey);
 
   useEffect(() => {
@@ -157,16 +157,6 @@ export const OrgItemsList: React.FC = () => {
     }
     setSelectedItem(item);
     setIsItemDrawerOpen(true);
-  };
-
-  const handleCopyEncrypted = async (encryptedValue: string, field: string): Promise<void> => {
-    try {
-      await copyToClipboard(encryptedValue);
-      setCopiedField(field);
-      setTimeout(() => setCopiedField(null), 2000);
-    } catch (error) {
-      console.error("Failed to copy:", error);
-    }
   };
 
   if (!user) {
@@ -289,7 +279,7 @@ export const OrgItemsList: React.FC = () => {
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
               onFocus={() => setIsSearchFocused(true)}
               onBlur={() => setIsSearchFocused(false)}
-              className="w-full pl-10 pr-4 py-2.5 md:py-3 bg-gray-800/50 backdrop-blur-sm border border-gray-700/50 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:border-gray-600 transition-all duration-300 text-sm md:text-base"
+              className={`w-full pl-10 pr-4 py-2.5 md:py-3 bg-gray-800/50 backdrop-blur-sm border ${isSearchFocused ? 'border-gray-600' : 'border-gray-700/50'} rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:border-gray-600 transition-all duration-300 text-sm md:text-base`}
             />
           </div>
 
@@ -466,7 +456,6 @@ export const OrgItemsList: React.FC = () => {
           userRole={userRole}
           canDecrypt={canDecrypt}
           canEdit={canEdit}
-          onCopyEncrypted={handleCopyEncrypted}
           onEdit={() => console.log("Edit clicked")}
         />
       </div>

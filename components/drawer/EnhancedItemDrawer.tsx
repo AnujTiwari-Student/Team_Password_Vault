@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { X, User, Lock, Shield, FileText, ExternalLink, Edit } from 'lucide-react';
 import { APIVaultItem, DecryptedData, MemberRole } from '@/types/vault';
 import { CopyButton } from '@/components/common/CopyButton';

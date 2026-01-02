@@ -6,7 +6,7 @@ import { useSessionTimeout } from '@/hooks/useSessionTimeout';
 import { formatTimeRemaining } from '@/utils/vault-helpers';
 
 export const SessionTimer: React.FC = () => {
-  const { sessionState, isActive, remainingTime, isWarning } = useSessionTimeout();
+  const { isActive, remainingTime, isWarning } = useSessionTimeout();
 
   if (!isActive) return null;
 

@@ -409,7 +409,7 @@ export const UnifiedVaultList: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-gray-700/50">
         {showVaultSelector ? (
           <Select value={vaultType} onValueChange={handleVaultTypeChange}>
-            <SelectTrigger className="w-full sm:w-[320px] bg-gray-800/50 border-2 border-gray-700 text-white hover:bg-gray-800 transition-colors py-6 px-4">
+            <SelectTrigger className="w-full sm:w-[320px] bg-gray-800/50 border-0 text-white hover:bg-gray-800 transition-colors py-6 px-4">
               <SelectValue>
                 <div className="flex items-center gap-3 py-2">
                   {vaultType === "personal" ? (
@@ -833,11 +833,11 @@ export const UnifiedVaultList: React.FC = () => {
         canEdit={canEdit}
         vaultType={vaultType}
         orgId={vaultType === "org" ? currentOrgId : null}
-        onDelete={(itemId) => {
+        onDelete={() => {
           toast.success("Item deleted (API not implemented yet)");
           fetchItems();
         }}
-        onEdit={(item) => {
+        onEdit={() => {
           toast.info("Edit feature coming soon");
         }}
       />

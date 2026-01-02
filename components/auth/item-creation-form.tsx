@@ -679,7 +679,7 @@ function ItemCreationForm({
                             Auto-generated or enter your own secret key
                           </p>
 
-                          {totpSecret && totpOtpAuthUrl && (
+                          {totpSecret && totpQrUrl && (
                             <div className="mt-4 space-y-3 p-3 bg-gray-900/50 rounded-lg border border-green-700/30">
                               <div className="flex items-center gap-2 text-green-400 text-sm">
                                 <Smartphone className="w-4 h-4" />
