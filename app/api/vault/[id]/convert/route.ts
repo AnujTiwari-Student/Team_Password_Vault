@@ -4,7 +4,7 @@ import { currentUser } from "@/lib/current-user";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await currentUser();
@@ -12,6 +12,7 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const params = await context.params;
     const { id: vaultId } = params;
     const { targetType } = await req.json();
 
@@ -27,7 +28,6 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // Get vault
     const vault = await prisma.vault.findUnique({
       where: { id: vaultId }
     });
@@ -36,14 +36,12 @@ export async function POST(
       return NextResponse.json({ error: "Vault not found" }, { status: 404 });
     }
 
-    // Only vault owner can convert
     if (vault.user_id !== user.id) {
       return NextResponse.json({ 
         error: "Only vault owner can convert vault type" 
       }, { status: 403 });
     }
 
-    // Check if already the target type
     if (vault.type === targetType) {
       return NextResponse.json({ 
         error: `Vault is already of type '${targetType}'` 
@@ -74,7 +72,6 @@ export async function POST(
         }
       });
 
-      // Update vault
       updatedVault = await prisma.vault.update({
         where: { id: vaultId },
         data: { 
@@ -89,10 +86,8 @@ export async function POST(
       console.log("✅ Vault converted to personal");
 
     } else {
-      // Converting from personal to org
       console.log("🔄 Converting personal vault to org...");
 
-      // Create new org
       const newOrg = await prisma.org.create({
         data: {
           name: `${vault.name} Organization`,
@@ -100,13 +95,11 @@ export async function POST(
         }
       });
 
-      // Check if OrgVaultKey exists for this org, otherwise create
       let orgVaultKey = await prisma.orgVaultKey.findFirst({
         where: { org_id: newOrg.id }
       });
 
       if (!orgVaultKey) {
-        // Get the user's personal vault key cipher to use for org
         const personalKey = await prisma.personalVaultKey.findUnique({
           where: { user_id: user.id }
         });
@@ -114,12 +107,11 @@ export async function POST(
         orgVaultKey = await prisma.orgVaultKey.create({
           data: {
             org_id: newOrg.id,
-            ovk_cipher: personalKey?.ovk_cipher || "" // Use existing cipher or empty
+            ovk_cipher: personalKey?.ovk_cipher || ""
           }
         });
       }
 
-      // Create owner membership
       await prisma.membership.create({
         data: {
           user_id: user.id,
@@ -129,7 +121,6 @@ export async function POST(
         }
       });
 
-      // Update vault
       updatedVault = await prisma.vault.update({
         where: { id: vaultId },
         data: {

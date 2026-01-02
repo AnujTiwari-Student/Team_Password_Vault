@@ -4,7 +4,7 @@ import { currentUser } from "@/lib/current-user";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await currentUser();
@@ -12,11 +12,11 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const params = await context.params;
     const { id: vaultId } = params;
 
     console.log("📈 [GET /api/vault/[id]/usage] Called:", { vaultId, userId: user.id });
 
-    // Verify vault access
     const vault = await prisma.vault.findUnique({
       where: { id: vaultId }
     });
@@ -25,7 +25,6 @@ export async function GET(
       return NextResponse.json({ error: "Vault not found" }, { status: 404 });
     }
 
-    // Check access
     let hasAccess = false;
 
     if (vault.type === "personal" && vault.user_id === user.id) {
@@ -54,7 +53,6 @@ export async function GET(
       }, { status: 403 });
     }
 
-    // Fetch usage statistics
     const [passwordCount, memberCount, vaultUser] = await Promise.all([
       prisma.item.count({
         where: { vault_id: vaultId }
@@ -70,18 +68,17 @@ export async function GET(
 
     console.log("📊 Usage stats:", { passwordCount, memberCount });
 
-    // Define limits based on vault type
     const isOrgVault = vault.type === "org";
     const limits = isOrgVault
       ? {
           passwords: 1000,
           members: 50,
-          storage: 10 * 1024 * 1024 * 1024, // 10GB
+          storage: 10 * 1024 * 1024 * 1024,
         }
       : {
           passwords: 100,
           members: 1,
-          storage: 1024 * 1024 * 1024, // 1GB
+          storage: 1024 * 1024 * 1024,
         };
 
     const usageData = {
@@ -94,7 +91,7 @@ export async function GET(
         limit: limits.members,
       },
       storage: {
-        current: 0, // Implement actual storage calculation if needed
+        current: 0,
         limit: limits.storage,
       },
       twoFaEnabled: vaultUser?.twofa_enabled || false,

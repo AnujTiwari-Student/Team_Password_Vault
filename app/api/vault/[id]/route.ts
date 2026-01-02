@@ -4,7 +4,7 @@ import { currentUser } from "@/lib/current-user";
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await currentUser();
@@ -12,6 +12,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const params = await context.params;
     const { id: vaultId } = params;
     const { name } = await req.json();
 
@@ -27,7 +28,6 @@ export async function PATCH(
       }, { status: 400 });
     }
 
-    // Get existing vault
     const existingVault = await prisma.vault.findUnique({
       where: { id: vaultId }
     });
@@ -36,13 +36,11 @@ export async function PATCH(
       return NextResponse.json({ error: "Vault not found" }, { status: 404 });
     }
 
-    // Check permissions
     let hasPermission = false;
 
     if (existingVault.type === "personal" && existingVault.user_id === user.id) {
       hasPermission = true;
     } else if (existingVault.type === "org" && existingVault.org_id) {
-      // Check if user is org owner
       const org = await prisma.org.findUnique({
         where: { id: existingVault.org_id }
       });
@@ -50,7 +48,6 @@ export async function PATCH(
       if (org?.owner_user_id === user.id) {
         hasPermission = true;
       } else {
-        // Check if user is admin/owner member
         const membership = await prisma.membership.findFirst({
           where: {
             org_id: existingVault.org_id,
@@ -71,7 +68,6 @@ export async function PATCH(
       }, { status: 403 });
     }
 
-    // Check for name conflicts
     if (existingVault.type === "org" && existingVault.org_id) {
       const duplicate = await prisma.vault.findFirst({
         where: {
@@ -102,7 +98,6 @@ export async function PATCH(
       }
     }
 
-    // Update vault name
     const updatedVault = await prisma.vault.update({
       where: { id: vaultId },
       data: { name: name.trim() }

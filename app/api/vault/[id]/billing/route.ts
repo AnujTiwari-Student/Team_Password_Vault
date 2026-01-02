@@ -4,7 +4,7 @@ import { currentUser } from "@/lib/current-user";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await currentUser();
@@ -12,6 +12,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const params = await context.params;
     const { id: vaultId } = params;
 
     console.log("📊 [GET /api/vault/[id]/billing] Called:", { vaultId, userId: user.id });
