@@ -1,67 +1,142 @@
-import { ITEM_TYPE_COLORS, ROLE_COLORS } from '@/constants/permission';
-import { MemberRole, ItemType } from '@/types/vault';
+// ✅ Import from central types file
+import {
+  MemberRole,
+  User,
+  Vault,
+  Membership,
+  VaultPermissions,
+} from "@/types/vault";
+import { Permission, ROLE_PERMISSIONS } from "@/constants/permission";
 
-export function getRoleBadgeColor(role: MemberRole | null): string {
-  if (!role) return ROLE_COLORS.viewer;
-  return ROLE_COLORS[role] || ROLE_COLORS.viewer;
-}
-
-export function getItemTypeColor(type: ItemType): string {
-  return ITEM_TYPE_COLORS[type] || ITEM_TYPE_COLORS.default;
-}
-
-export function getMultiTypeColor(types: ItemType[]): string {
-  if (types.length === 1) {
-    return getItemTypeColor(types[0]);
-  }
-  return 'bg-gradient-to-r from-blue-900/30 to-green-900/30 text-white border-blue-700/30';
-}
-
-export function formatTimestamp(timestamp: string): string {
-  return new Date(timestamp).toLocaleString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-export function formatTimeRemaining(milliseconds: number): string {
-  const minutes = Math.floor(milliseconds / 60000);
-  const seconds = Math.floor((milliseconds % 60000) / 1000);
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
-
-export function sanitizeItemName(name: string): string {
-  return name.trim().slice(0, 100);
-}
-
-export function validateUrl(url: string): boolean {
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export interface Membership {
-  org_id: string;
-  role: MemberRole;
-  [key: string]: unknown;
-}
-
-export interface UserWithMemberships {
+/* ---------------------------------- */
+/* Shared helper type                  */
+/* ---------------------------------- */
+export type UserWithMemberships = User & {
   member?: Membership | Membership[];
+};
+
+/* ---------------------------------- */
+/* Helpers                             */
+/* ---------------------------------- */
+function normalizeMemberships(
+  member?: Membership | Membership[]
+): Membership[] {
+  if (!member) return [];
+  return Array.isArray(member) ? member : [member];
 }
 
 export function getMembershipForOrg(
-  user: UserWithMemberships,
+  user: UserWithMemberships | null,
   orgId: string
 ): Membership | null {
-  if (!user.member) return null;
+  if (!user) return null;
   
-  const memberships = Array.isArray(user.member) ? user.member : [user.member];
-  return memberships.find((m) => m.org_id === orgId) || null;
+  const memberships = normalizeMemberships(user.member);
+  return memberships.find((m) => m.org_id === orgId) ?? null;
+}
+
+/* ---------------------------------- */
+/* Vault Role                          */
+/* ---------------------------------- */
+export function getUserRoleInVault(
+  user: UserWithMemberships | null,
+  vault: Vault | null
+): MemberRole | null {
+  if (!user || !vault) return null;
+
+  if (vault.type === "personal") {
+    return vault.user_id === user.id ? "owner" : null;
+  }
+
+  if (vault.type === "org" && vault.org_id) {
+    const membership = getMembershipForOrg(user, vault.org_id);
+    if (membership) return membership.role;
+
+    if (
+      user.org?.owner_user_id === user.id &&
+      user.org.id === vault.org_id
+    ) {
+      return "owner";
+    }
+  }
+
+  return null;
+}
+
+/* ---------------------------------- */
+/* Permission checks                   */
+/* ---------------------------------- */
+function hasPermission(
+  role: MemberRole | null,
+  permission: Permission
+): boolean {
+  if (!role) return false;
+  return ROLE_PERMISSIONS[role]?.includes(permission) ?? false;
+}
+
+export const canUserDecrypt = (role: MemberRole | null) =>
+  hasPermission(role, "decrypt");
+
+export const canUserEdit = (role: MemberRole | null) =>
+  hasPermission(role, "edit");
+
+export const canUserManage = (role: MemberRole | null) =>
+  hasPermission(role, "manage");
+
+export const canUserShare = (role: MemberRole | null) =>
+  hasPermission(role, "share");
+
+export function getUserPermissions(
+  role: MemberRole | null
+): VaultPermissions {
+  return {
+    canView: hasPermission(role, "view"),
+    canEdit: hasPermission(role, "edit"),
+    canDecrypt: hasPermission(role, "decrypt"),
+    canManage: hasPermission(role, "manage"),
+    canShare: hasPermission(role, "share"),
+  };
+}
+
+/* ---------------------------------- */
+/* Org / Admin helpers                 */
+/* ---------------------------------- */
+export function isAdmin(user: UserWithMemberships | null): boolean {
+  if (!user) return false;
+
+  if (user.org?.owner_user_id === user.id) return true;
+
+  return normalizeMemberships(user.member).some(
+    (m) => m.role === "admin" || m.role === "owner"
+  );
+}
+
+export function isOrgOwner(user: User | null): boolean {
+  if (!user) return false;
+  return user.org?.owner_user_id === user.id;
+}
+
+export function getUserOrgRole(
+  user: UserWithMemberships | null,
+  orgId: string
+): MemberRole | null {
+  if (!user) return null;
+
+  const membership = normalizeMemberships(user.member).find(
+    (m) => m.org_id === orgId
+  );
+
+  return membership?.role ?? null;
+}
+
+export function canCreateOrg(user: UserWithMemberships | null): boolean {
+  return isAdmin(user) || isOrgOwner(user);
+}
+
+export function canManageMembers(
+  user: UserWithMemberships | null,
+  orgId: string
+): boolean {
+  const role = getUserOrgRole(user, orgId);
+  return role === "owner" || role === "admin";
 }

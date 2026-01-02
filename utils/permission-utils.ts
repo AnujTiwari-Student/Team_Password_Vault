@@ -1,95 +1,113 @@
-import { MemberRole, User, Vault, Membership, VaultPermissions } from '@/types/vault';
-import { getMembershipForOrg } from './vault-helpers';
-import { Permission, ROLE_PERMISSIONS } from '@/constants/permission';
+import {
+  MemberRole,
+  User,
+  Vault,
+  Membership,
+  VaultPermissions,
+} from "@/types/vault";
+import { getMembershipForOrg, type UserWithMemberships } from "@/utils/vault-helpers";
+import { Permission, ROLE_PERMISSIONS } from "@/constants/permission";
 
-export function getUserRoleInVault(user: User | null, vault: Vault | null): MemberRole | null {
+function normalizeMemberships(
+  member?: Membership | Membership[]
+): Membership[] {
+  if (!member) return [];
+  return Array.isArray(member) ? member : [member];
+}
+
+export function getUserRoleInVault(
+  user: UserWithMemberships | null,
+  vault: Vault | null
+): MemberRole | null {
   if (!user || !vault) return null;
-  
-  if (vault.type === 'personal') {
-    return vault.user_id === user.id ? 'owner' : null;
+
+  if (vault.type === "personal") {
+    return vault.user_id === user.id ? "owner" : null;
   }
-  
-  if (vault.type === 'org' && vault.org_id) {
+
+  if (vault.type === "org" && vault.org_id) {
     const membership = getMembershipForOrg(user, vault.org_id);
-    
-    if (membership) {
-      return membership.role;
-    }
-    
-    if (user.org?.owner_user_id === user.id && user.org.id === vault.org_id) {
-      return 'owner';
+    if (membership) return membership.role;
+
+    if (
+      user.org?.owner_user_id === user.id &&
+      user.org.id === vault.org_id
+    ) {
+      return "owner";
     }
   }
-  
+
   return null;
 }
 
-function hasPermission(role: MemberRole | null, permission: Permission): boolean {
+function hasPermission(
+  role: MemberRole | null,
+  permission: Permission
+): boolean {
   if (!role) return false;
-  return ROLE_PERMISSIONS[role]?.includes(permission) || false;
+  return ROLE_PERMISSIONS[role]?.includes(permission) ?? false;
 }
 
-export function canUserDecrypt(userRole: MemberRole | null): boolean {
-  return hasPermission(userRole, 'decrypt');
-}
+export const canUserDecrypt = (role: MemberRole | null) =>
+  hasPermission(role, "decrypt");
 
-export function canUserEdit(userRole: MemberRole | null): boolean {
-  return hasPermission(userRole, 'edit');
-}
+export const canUserEdit = (role: MemberRole | null) =>
+  hasPermission(role, "edit");
 
-export function canUserManage(userRole: MemberRole | null): boolean {
-  return hasPermission(userRole, 'manage');
-}
+export const canUserManage = (role: MemberRole | null) =>
+  hasPermission(role, "manage");
 
-export function canUserShare(userRole: MemberRole | null): boolean {
-  return hasPermission(userRole, 'share');
-}
+export const canUserShare = (role: MemberRole | null) =>
+  hasPermission(role, "share");
 
-export function getUserPermissions(userRole: MemberRole | null): VaultPermissions {
+export function getUserPermissions(
+  role: MemberRole | null
+): VaultPermissions {
   return {
-    canView: hasPermission(userRole, 'view'),
-    canEdit: hasPermission(userRole, 'edit'),
-    canDecrypt: hasPermission(userRole, 'decrypt'),
-    canManage: hasPermission(userRole, 'manage'),
-    canShare: hasPermission(userRole, 'share'),
+    canView: hasPermission(role, "view"),
+    canEdit: hasPermission(role, "edit"),
+    canDecrypt: hasPermission(role, "decrypt"),
+    canManage: hasPermission(role, "manage"),
+    canShare: hasPermission(role, "share"),
   };
 }
 
-export function isAdmin(user: User | null): boolean {
+export function isAdmin(user: UserWithMemberships | null): boolean {
   if (!user) return false;
-  
-  if (user.org?.owner_user_id === user.id) {
-    return true;
-  }
-  
-  if (user.member) {
-    const memberships = Array.isArray(user.member) ? user.member : [user.member];
-    return memberships.some((m: Membership) => m.role === 'admin' || m.role === 'owner');
-  }
-  
-  return false;
+
+  if (user.org?.owner_user_id === user.id) return true;
+
+  return normalizeMemberships(user.member).some(
+    (m) => m.role === "admin" || m.role === "owner"
+  );
 }
 
-
-export function isOrgOwner(user: any): boolean {
+export function isOrgOwner(user: User | null): boolean {
   if (!user) return false;
   return user.org?.owner_user_id === user.id;
 }
 
-export function getUserOrgRole(user: any, orgId: string): string | null {
-  if (!user || !user.member) return null;
-  
-  const memberships = Array.isArray(user.member) ? user.member : [user.member];
-  const membership = memberships.find((m: Membership) => m.org_id === orgId);
-  
-  return membership?.role || null;
+export function getUserOrgRole(
+  user: UserWithMemberships | null,
+  orgId: string
+): MemberRole | null {
+  if (!user) return null;
+
+  const membership = normalizeMemberships(user.member).find(
+    (m) => m.org_id === orgId
+  );
+
+  return membership?.role ?? null;
 }
 
-export function canCreateOrg(user: any): boolean {
+export function canCreateOrg(user: UserWithMemberships | null): boolean {
   return isAdmin(user) || isOrgOwner(user);
 }
 
-export function canManageMembers(user: any, orgId: string): boolean {
+export function canManageMembers(
+  user: UserWithMemberships | null,
+  orgId: string
+): boolean {
   const role = getUserOrgRole(user, orgId);
-  return role === 'owner' || role === 'admin';
+  return role === "owner" || role === "admin";
 }
