@@ -50,11 +50,13 @@ const MasterPassphraseSetup: React.FC = () => {
   const { isCopied, copy } = useClipboard({ successDuration: 100000 });
 
   const { umkCryptoKey } = useUserMasterKey(mnemonic);
-  const ovkCryptoKey = useVaultOVK(
+  const ovkResult = useVaultOVK(
     umkCryptoKey,
     user?.vault?.ovk_id || null,
     user?.account_type
   );
+
+  const ovkCryptoKey = ovkResult?.ovkCryptoKey || null;
 
   const runSetup = useCallback(async () => {
     setStatus("Generating Master Key...");
@@ -169,7 +171,8 @@ const MasterPassphraseSetup: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setStatus(`Success! Org created: ${data.orgId}. Redirecting in 5 seconds...`);
+        const successMessage = `Success! Org created: ${data.orgId}. Redirecting in 5 seconds...`;
+        setStatus(successMessage);
         toast.success("Organization created successfully!");
         setIsProcessing(false);
         await update();
@@ -330,6 +333,11 @@ const MasterPassphraseSetup: React.FC = () => {
               location.
             </p>
           </div>
+          {status && (
+            <div className="mt-4 p-3 bg-gray-800 border border-gray-700 rounded-lg">
+              <p className="text-xs text-gray-300 text-center">{status}</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

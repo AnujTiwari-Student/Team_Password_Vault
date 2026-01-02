@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { currentUser } from "@/lib/current-user";
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   try {
     const user = await currentUser();
     if (!user || !user.id) {
