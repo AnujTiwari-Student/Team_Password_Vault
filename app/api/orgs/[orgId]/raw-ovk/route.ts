@@ -4,7 +4,7 @@ import { prisma } from "@/db";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { orgId: string } }
+  context: { params: Promise<{ orgId: string }> }
 ) {
   try {
     const session = await auth();
@@ -15,6 +15,7 @@ export async function GET(
       }, { status: 401 });
     }
 
+    const params = await context.params;
     const orgId = params.orgId;
 
     const orgVaultKey = await prisma.orgVaultKey.findFirst({
