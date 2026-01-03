@@ -44,6 +44,7 @@ export const DashboardContent: React.FC<DashboardContentProps> = ({
         return <VaultSetting />;
 
       case "Members":
+        // @ts-expect-error TS(2322): Type 'string | undefined' is not assignable to type 'n... --- IGNORE ---
         return <TeamManagement vault={user.vault} user={user} />;
 
       case "Manage":

@@ -1,4 +1,5 @@
-// ✅ Import from central types file
+// utils/vault-helpers.ts
+
 import {
   MemberRole,
   User,
@@ -25,12 +26,31 @@ function normalizeMemberships(
   return Array.isArray(member) ? member : [member];
 }
 
+/* ---------------------------------- */
+/* ⏱️ Session helper (FIX)             */
+/* ---------------------------------- */
+export function formatTimeRemaining(ms: number): string {
+  if (ms <= 0) return "00:00";
+
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
+    2,
+    "0"
+  )}`;
+}
+
+/* ---------------------------------- */
+/* Membership helpers                  */
+/* ---------------------------------- */
 export function getMembershipForOrg(
   user: UserWithMemberships | null,
   orgId: string
 ): Membership | null {
   if (!user) return null;
-  
+
   const memberships = normalizeMemberships(user.member);
   return memberships.find((m) => m.org_id === orgId) ?? null;
 }
@@ -140,3 +160,56 @@ export function canManageMembers(
   const role = getUserOrgRole(user, orgId);
   return role === "owner" || role === "admin";
 }
+
+/* ---------------------------------- */
+/* ⏱️ Time formatting                  */
+/* ---------------------------------- */
+export function formatTimestamp(
+  timestamp: string | Date
+): string {
+  const date = typeof timestamp === "string"
+    ? new Date(timestamp)
+    : timestamp;
+
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/* ---------------------------------- */
+/* 🎨 UI helpers                       */
+/* ---------------------------------- */
+export function getRoleBadgeColor(
+  role: MemberRole | null
+): string {
+  switch (role) {
+    case "owner":
+      return "bg-yellow-900/30 text-yellow-300 border-yellow-700/30 border";
+    case "admin":
+      return "bg-blue-900/30 text-blue-300 border-blue-700/30 border";
+    case "member":
+      return "bg-gray-700/50 text-gray-300 border-gray-600/30 border";
+    case "viewer":
+      return "bg-purple-900/30 text-purple-300 border-purple-700/30 border";
+    default:
+      return "bg-gray-700/30 text-gray-400 border-gray-600/30 border";
+  }
+}
+
+export function getMultiTypeColor(types: string[]): string {
+  if (types.includes("password")) {
+    return "bg-red-900/30 text-red-300 border-red-700/30";
+  }
+  if (types.includes("note")) {
+    return "bg-purple-900/30 text-purple-300 border-purple-700/30";
+  }
+  if (types.includes("login")) {
+    return "bg-blue-900/30 text-blue-300 border-blue-700/30";
+  }
+  return "bg-gray-700/30 text-gray-300 border-gray-600/30";
+}
+

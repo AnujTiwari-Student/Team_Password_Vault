@@ -1,15 +1,26 @@
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import React, { useState } from 'react'
-import { User } from '@/types/vault';
+import { User, Vault } from '@/types/vault';
 import { Settings, CreditCard, Database } from 'lucide-react';
 import { VaultNameEditor } from '../settings/VaultNameEditor';
-// import { VaultTypeConverter } from '../settings/VaultTypeConverter';
 import { BillingComponent } from '../settings/BillingComponent';
 import { VaultLimitsDisplay } from '../settings/VaultLimitDisplay';
 
+
+interface ExtendedVault extends Vault {
+  name: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface ExtendedUser extends Omit<User, 'vault'> {
+  vault?: ExtendedVault;
+}
+
 function VaultSetting() {
-  const user = useCurrentUser() as User | null;
+  const user = useCurrentUser() as ExtendedUser | null;
   const [activeTab, setActiveTab] = useState<'general' | 'billing' | 'limits' | 'members'>('general');
+
 
   if (!user) {
     return (
@@ -20,6 +31,7 @@ function VaultSetting() {
     );
   }
 
+
   const vault = user.vault;
   if (!vault) {
     return (
@@ -28,6 +40,7 @@ function VaultSetting() {
       </div>
     );
   }
+
 
   return (
     <div className="w-full max-w-full overflow-x-hidden">
@@ -45,6 +58,7 @@ function VaultSetting() {
             {vault.type === 'personal' ? 'Personal' : 'Organization'}
           </div>
         </div>
+
 
         <div className="flex flex-wrap gap-2 bg-gray-800/30 p-2 rounded-xl overflow-x-auto">
           <button
@@ -80,47 +94,30 @@ function VaultSetting() {
             <Database className="w-4 h-4" />
             <span className="text-sm md:text-base">Usage</span>
           </button>
-          {/* {vault.type === 'org' && (
-            <button
-              onClick={() => setActiveTab('members')}
-              className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-lg transition-colors whitespace-nowrap ${
-                activeTab === 'members' 
-                  ? 'bg-gray-700/50 text-white' 
-                  : 'text-gray-400 hover:text-white hover:bg-gray-700/30'
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              <span className="text-sm md:text-base">Members</span>
-            </button>
-          )} */}
         </div>
+
 
         <div className="space-y-4 md:space-y-6">
           {activeTab === 'general' && (
             <div className="space-y-4 md:space-y-6">
               <VaultNameEditor vault={vault} />
-              {/* <VaultTypeConverter vault={vault} user={user} /> */}
             </div>
           )}
+
 
           {activeTab === 'billing' && (
-            <BillingComponent user={user} />
+            <BillingComponent user={user as User} />
           )}
+
 
           {activeTab === 'limits' && (
-            <VaultLimitsDisplay user={user} vault={vault} />
+            <VaultLimitsDisplay user={user as User} vault={vault} />
           )}
-
-          {/* {activeTab === 'members' && vault.type === 'org' && (
-            <div className="bg-gray-800/30 rounded-xl p-4 md:p-6 border border-gray-700/30">
-              <h3 className="text-lg md:text-xl font-semibold mb-4">Organization Members</h3>
-              <p className="text-gray-400 text-sm md:text-base">Member management coming soon...</p>
-            </div>
-          )} */}
         </div>
       </div>
     </div>
   );
 }
+
 
 export default VaultSetting;

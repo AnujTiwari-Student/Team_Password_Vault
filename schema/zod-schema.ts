@@ -1,4 +1,4 @@
-import { ItemType, MemberRole } from "@prisma/client";
+import { ItemType } from "@prisma/client";
 import * as z from "zod";
 
 const ERR_PASSWORD_REQ = "Password doesn't meet requirements";

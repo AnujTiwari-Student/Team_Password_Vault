@@ -3,10 +3,12 @@ import { unwrapKey, decryptData } from '@/utils/client-crypto';
 import { APIVaultItem, DecryptedData } from '@/types/vault';
 import { useSessionTimeout } from './useSessionTimeout';
 
+
 export function useDecryption(ovkCryptoKey: CryptoKey | null) {
   const [decryptedItems, setDecryptedItems] = useState<Record<string, DecryptedData>>({});
   const [decrypting, setDecrypting] = useState<Record<string, boolean>>({});
   const { isActive } = useSessionTimeout();
+
 
   useEffect(() => {
     if (!isActive) {
@@ -14,49 +16,59 @@ export function useDecryption(ovkCryptoKey: CryptoKey | null) {
     }
   }, [isActive]);
 
+
   const decryptItem = useCallback(async (item: APIVaultItem): Promise<DecryptedData | null> => {
-    if (!ovkCryptoKey || !item.item_key_wrapped) {
+    const itemKeyWrapped = 'item_key_wrapped' in item ? item.item_key_wrapped : null;
+    
+    if (!ovkCryptoKey || !itemKeyWrapped) {
       return null;
     }
+
 
     try {
       setDecrypting(prev => ({ ...prev, [item.id]: true }));
 
-      const itemKey = await unwrapKey(item.item_key_wrapped, ovkCryptoKey);
+
+      const itemKey = await unwrapKey(itemKeyWrapped as string, ovkCryptoKey);
       
       const decrypted: DecryptedData = {};
 
-      if (item.username_ct) {
+
+      if ('username_ct' in item && item.username_ct) {
         try {
-          decrypted.username = await decryptData(item.username_ct, itemKey);
+          decrypted.username = await decryptData(item.username_ct as string, itemKey);
         } catch (error) {
           console.error('Failed to decrypt username:', error);
         }
       }
 
-      if (item.password_ct) {
+
+      if ('password_ct' in item && item.password_ct) {
         try {
-          decrypted.password = await decryptData(item.password_ct, itemKey);
+          decrypted.password = await decryptData(item.password_ct as string, itemKey);
         } catch (error) {
           console.error('Failed to decrypt password:', error);
         }
       }
 
-      if (item.totp_seed_ct) {
+
+      if ('totp_seed_ct' in item && item.totp_seed_ct) {
         try {
-          decrypted.totp_seed = await decryptData(item.totp_seed_ct, itemKey);
+          decrypted.totp_seed = await decryptData(item.totp_seed_ct as string, itemKey);
         } catch (error) {
           console.error('Failed to decrypt TOTP seed:', error);
         }
       }
 
-      if (item.note_ct) {
+
+      if ('note_ct' in item && item.note_ct) {
         try {
-          decrypted.note = await decryptData(item.note_ct, itemKey);
+          decrypted.note = await decryptData(item.note_ct as string, itemKey);
         } catch (error) {
           console.error('Failed to decrypt note:', error);
         }
       }
+
 
       setDecryptedItems(prev => ({ ...prev, [item.id]: decrypted }));
       
@@ -69,17 +81,21 @@ export function useDecryption(ovkCryptoKey: CryptoKey | null) {
     }
   }, [ovkCryptoKey]);
 
+
   const getDecryptedItem = useCallback((itemId: string): DecryptedData | null => {
     return decryptedItems[itemId] || null;
   }, [decryptedItems]);
+
 
   const isDecrypting = useCallback((itemId: string): boolean => {
     return decrypting[itemId] || false;
   }, [decrypting]);
 
+
   const clearDecryptedData = useCallback(() => {
     setDecryptedItems({});
   }, []);
+
 
   return {
     decryptItem,

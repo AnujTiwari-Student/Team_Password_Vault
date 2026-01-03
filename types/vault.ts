@@ -11,16 +11,36 @@ export interface Membership {
   // Add any other properties your Membership needs
 }
 
+// types/vault.ts
+
+export type ItemType = "login" | "note" | "totp";
+
+
+// types/vault.ts
+
+export type VaultType = "personal" | "org";
+
+// types/vault.ts
+
 export interface User {
   id: string;
-  email: string;
-  name?: string;
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+
   org?: {
     id: string;
     owner_user_id: string;
-  };
-  // Add other user properties
+  } | null;
+
+  member?: Membership | Membership[];
+
+  vault?: {
+    id: string;
+    type: "personal" | "org";
+  } | null;
 }
+
 
 export interface Vault {
   id: string;
@@ -38,3 +58,34 @@ export interface VaultPermissions {
   canManage: boolean;
   canShare: boolean;
 }
+
+
+
+export interface APIVaultItem {
+  id: string;
+  vault_id: string; // ✅ ADD THIS
+  name: string;
+  type: string[];
+
+  url?: string | null;
+
+  username_ct?: string | null;
+  password_ct?: string | null;
+  totp_seed_ct?: string | null;
+  note_ct?: string | null;
+
+  tags?: string[];
+
+  created_at: string;
+  updated_at: string;
+}
+
+
+
+export interface DecryptedData {
+  username?: string;
+  password?: string;
+  totp_seed?: string;
+  note?: string;
+}
+

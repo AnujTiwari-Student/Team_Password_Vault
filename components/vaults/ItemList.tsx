@@ -1,5 +1,6 @@
 "use client";
 
+
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import axios from "axios";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -34,14 +35,17 @@ import { ExtendedUser, MemberWithOrg } from "@/types/user";
 import { ViewItemModal } from "@/components/modals/ViewItemModal";
 import AddingItemsModal from "../modals/AddingItems";
 
+
 type VaultType = "personal" | "org";
 type ItemType = "login" | "note" | "totp";
 type UserRole = "owner" | "admin" | "member" | "viewer";
+
 
 export const UnifiedVaultList: React.FC = () => {
   const user = useCurrentUser() as ExtendedUser | null;
   const searchParams = useSearchParams();
   const orgIdFromUrl = searchParams.get("org");
+
 
   const [vaultType, setVaultType] = useState<VaultType>("personal");
   const [items, setItems] = useState<APIVaultItem[]>([]);
@@ -56,15 +60,18 @@ export const UnifiedVaultList: React.FC = () => {
   const [isFetching, setIsFetching] = useState(false);
   const [fetchedRole, setFetchedRole] = useState<UserRole | null>(null);
 
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<APIVaultItem | null>(null);
+
 
   useEffect(() => {
     if (user) {
       console.log('👤 USER OBJECT:', JSON.stringify(user, null, 2));
     }
   }, [user]);
+
 
   const hasOrgAccess = useMemo(() => {
     if (user?.org?.id) {
@@ -81,6 +88,7 @@ export const UnifiedVaultList: React.FC = () => {
     return false;
   }, [user]);
 
+
   const isOrgOnlyAccount = useMemo(() => {
     const isOrgOwner = user?.account_type === 'org';
     const hasPersonalVault = !!user?.vault?.id;
@@ -88,17 +96,20 @@ export const UnifiedVaultList: React.FC = () => {
     return isOrgOwner && !hasPersonalVault;
   }, [user]);
 
+
   const showPersonalVault = useMemo(() => {
     const show = !!user?.vault?.id;
     console.log('🔍 Show personal vault:', show);
     return show;
   }, [user]);
 
+
   const showVaultSelector = useMemo(() => {
     const show = showPersonalVault && hasOrgAccess;
     console.log('🔍 Show vault selector:', show);
     return show;
   }, [showPersonalVault, hasOrgAccess]);
+
 
   useEffect(() => {
     if (isOrgOnlyAccount) {
@@ -111,6 +122,7 @@ export const UnifiedVaultList: React.FC = () => {
       setVaultType("org");
     }
   }, [orgIdFromUrl, hasOrgAccess, isOrgOnlyAccount, showPersonalVault]);
+
 
   const currentOrgId = useMemo(() => {
     if (vaultType === "org") {
@@ -133,6 +145,7 @@ export const UnifiedVaultList: React.FC = () => {
     }
     return null;
   }, [vaultType, user, orgIdFromUrl]);
+
 
   useEffect(() => {
     const fetchOrgVault = async () => {
@@ -162,8 +175,10 @@ export const UnifiedVaultList: React.FC = () => {
       }
     };
 
+
     fetchOrgVault();
   }, [vaultType, currentOrgId]);
+
 
   const vaultId = useMemo(() => {
     if (vaultType === "personal") {
@@ -176,15 +191,18 @@ export const UnifiedVaultList: React.FC = () => {
         return orgVaultId;
       }
 
+
       if (user?.org?.vault_id) {
         console.log('🔍 Org vault ID (from user.org):', user.org.vault_id);
         return user.org.vault_id;
       }
 
+
       console.log('❌ No vault ID found');
       return null;
     }
   }, [vaultType, user, orgVaultId]);
+
 
   const userRole = useMemo((): UserRole | null => {
     if (vaultType === "personal") {
@@ -218,11 +236,13 @@ export const UnifiedVaultList: React.FC = () => {
     return null;
   }, [vaultType, user, currentOrgId, fetchedRole]);
 
+
   const canEdit = useMemo(() => {
     const result = userRole ? canUserEdit(userRole) : false;
     console.log('🔍 Can edit:', result, 'Role:', userRole);
     return result;
   }, [userRole]);
+
 
   const fetchItems = useCallback(async () => {
     if (!vaultId) {
@@ -232,12 +252,15 @@ export const UnifiedVaultList: React.FC = () => {
       return;
     }
 
+
     setIsFetching(true);
     setLoading(true);
+
 
     try {
       let endpoint = "";
       let params: Record<string, string> = {};
+
 
       if (vaultType === "personal") {
         endpoint = "/api/items";
@@ -253,10 +276,13 @@ export const UnifiedVaultList: React.FC = () => {
         };
       }
 
+
       console.log("📡 Fetching items:", { endpoint, params, vaultType });
+
 
       const queryString = new URLSearchParams(params).toString();
       const response = await axios.get(`${endpoint}?${queryString}`);
+
 
       setItems(response.data.items || []);
       setError(null);
@@ -270,7 +296,9 @@ export const UnifiedVaultList: React.FC = () => {
     } catch (error) {
       console.error("❌ Failed to fetch items:", error);
 
+
       let errorMessage = "Failed to load vault items";
+
 
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 400) {
@@ -282,6 +310,7 @@ export const UnifiedVaultList: React.FC = () => {
         }
       }
 
+
       setError(errorMessage);
       setItems([]);
     } finally {
@@ -289,6 +318,7 @@ export const UnifiedVaultList: React.FC = () => {
       setIsFetching(false);
     }
   }, [vaultId, vaultType, currentOrgId, fetchedRole]);
+
 
   useEffect(() => {
     if (user && vaultId) {
@@ -300,10 +330,12 @@ export const UnifiedVaultList: React.FC = () => {
     }
   }, [user, vaultId, fetchItems]);
 
+
   const handleItemClick = (item: APIVaultItem) => {
     setSelectedItem(item);
     setShowViewModal(true);
   };
+
 
   const handleAddItem = () => {
     console.log('🔘 Add button clicked. canEdit:', canEdit, 'vaultId:', vaultId, 'userRole:', userRole);
@@ -317,6 +349,7 @@ export const UnifiedVaultList: React.FC = () => {
     }
     setShowAddModal(true);
   };
+
 
   const handleVaultTypeChange = (newType: VaultType) => {
     if (newType === "org" && !hasOrgAccess) {
@@ -334,25 +367,32 @@ export const UnifiedVaultList: React.FC = () => {
     setItems([]);
   };
 
+
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
+      const itemTags = item.tags || [];
       const matchesSearch =
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.tags.some((tag) =>
+        itemTags.some((tag) =>
           tag.toLowerCase().includes(searchTerm.toLowerCase())
         );
       const matchesType =
-        selectedType === "all" || item.type.includes(selectedType);
-      const matchesTag = !selectedTag || item.tags.includes(selectedTag);
+        selectedType === "all" || item.type.includes(selectedType as ItemType);
+      const matchesTag = !selectedTag || itemTags.includes(selectedTag);
       return matchesSearch && matchesType && matchesTag;
     });
   }, [items, searchTerm, selectedType, selectedTag]);
 
+
   const availableTags = useMemo(() => {
     const tags = new Set<string>();
-    items.forEach((item) => item.tags.forEach((tag) => tags.add(tag)));
+    items.forEach((item) => {
+      const itemTags = item.tags || [];
+      itemTags.forEach((tag) => tags.add(tag));
+    });
     return Array.from(tags).sort();
   }, [items]);
+
 
   const getItemIcon = (type: ItemType[]) => {
     if (type.includes("login"))
@@ -364,7 +404,8 @@ export const UnifiedVaultList: React.FC = () => {
     return <Lock className="w-5 h-5 text-gray-400" />;
   };
 
-  const getTypeColor = (type: ItemType) => {
+
+  const getTypeColor = (type: string) => {
     switch (type) {
       case "login":
         return "bg-blue-900/30 text-blue-300 border-blue-700/30";
@@ -376,6 +417,7 @@ export const UnifiedVaultList: React.FC = () => {
         return "bg-gray-900/30 text-gray-300 border-gray-700/30";
     }
   };
+
 
   const orgName = useMemo(() => {
     if (vaultType !== 'org') return null;
@@ -393,6 +435,7 @@ export const UnifiedVaultList: React.FC = () => {
     return "Organization";
   }, [user, vaultType, currentOrgId]);
 
+
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-[500px]">
@@ -403,6 +446,7 @@ export const UnifiedVaultList: React.FC = () => {
       </div>
     );
   }
+
 
   return (
     <div className="space-y-6 p-6">
@@ -493,6 +537,7 @@ export const UnifiedVaultList: React.FC = () => {
           </div>
         )}
 
+
         <button
           onClick={handleAddItem}
           disabled={!canEdit || !vaultId}
@@ -517,6 +562,7 @@ export const UnifiedVaultList: React.FC = () => {
           <span>Add Item</span>
         </button>
       </div>
+
 
       <div className="flex items-center gap-4">
         <div
@@ -549,6 +595,7 @@ export const UnifiedVaultList: React.FC = () => {
         </div>
       </div>
 
+
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -569,6 +616,7 @@ export const UnifiedVaultList: React.FC = () => {
           )}
         </div>
 
+
         <div className="flex gap-3">
           <button
             onClick={() => setShowFilters(!showFilters)}
@@ -586,6 +634,7 @@ export const UnifiedVaultList: React.FC = () => {
               </span>
             )}
           </button>
+
 
           <div className="flex bg-gray-800/50 border-2 border-gray-700 rounded-xl overflow-hidden">
             <button
@@ -613,6 +662,7 @@ export const UnifiedVaultList: React.FC = () => {
         </div>
       </div>
 
+
       {showFilters && (
         <div className="bg-gray-800/30 backdrop-blur-sm border-2 border-gray-700/50 rounded-xl p-6 shadow-xl">
           <div className="flex items-center justify-between mb-6">
@@ -631,21 +681,22 @@ export const UnifiedVaultList: React.FC = () => {
             </button>
           </div>
 
+
           <div className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-3">
                 Item Type
               </label>
               <div className="flex flex-wrap gap-2">
-                {["all", "login", "note", "totp"].map((type) => (
+                {(["all", "login", "note", "totp"] as const).map((type) => (
                   <button
                     key={type}
-                    onClick={() => setSelectedType(type as ItemType | "all")}
+                    onClick={() => setSelectedType(type === "all" ? "all" : type)}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                       selectedType === type
                         ? type === "all"
                           ? "bg-gray-700 border-2 border-gray-600 text-white shadow-lg scale-105"
-                          : `${getTypeColor(type as ItemType)} border-2 shadow-lg scale-105`
+                          : `${getTypeColor(type)} border-2 shadow-lg scale-105`
                         : "bg-gray-700/30 border-2 border-transparent text-gray-400 hover:bg-gray-700/50 hover:text-gray-300"
                     }`}
                   >
@@ -654,6 +705,7 @@ export const UnifiedVaultList: React.FC = () => {
                 ))}
               </div>
             </div>
+
 
             {availableTags.length > 0 && (
               <div>
@@ -683,6 +735,7 @@ export const UnifiedVaultList: React.FC = () => {
         </div>
       )}
 
+
       {error && !isFetching && (
         <div className="bg-red-900/20 border-2 border-red-700/50 rounded-xl p-5 flex items-start gap-4 shadow-lg">
           <div className="p-2 bg-red-500/20 rounded-lg flex-shrink-0">
@@ -696,6 +749,7 @@ export const UnifiedVaultList: React.FC = () => {
           </div>
         </div>
       )}
+
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
@@ -739,78 +793,85 @@ export const UnifiedVaultList: React.FC = () => {
               : "space-y-4"
           }
         >
-          {filteredItems.map((item) => (
-            <div
-              key={item.id}
-              onClick={() => handleItemClick(item)}
-              className={`bg-gray-800/40 backdrop-blur-sm border-2 border-gray-700/50 rounded-xl p-5 hover:bg-gray-700/40 hover:border-gray-600 hover:shadow-xl transition-all cursor-pointer group ${
-                viewMode === "list" ? "flex items-center gap-4" : ""
-              }`}
-            >
-              <div className={`flex items-start ${viewMode === "list" ? "gap-4 flex-1" : "justify-between mb-4"}`}>
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="p-2.5 bg-gray-700/50 rounded-xl group-hover:bg-gray-600/50 group-hover:scale-110 transition-all flex-shrink-0">
-                    {getItemIcon(item.type)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-white font-semibold truncate mb-1 group-hover:text-blue-300 transition-colors">
-                      {item.name}
-                    </h3>
-                    <p className="text-xs text-gray-400 truncate flex items-center gap-1">
-                      {item.url ? (
-                        <>
-                          <Globe className="w-3 h-3 flex-shrink-0" />
-                          {item.url}
-                        </>
-                      ) : (
-                        "No URL"
-                      )}
-                    </p>
+          {filteredItems.map((item) => {
+            const itemTags = item.tags || [];
+            return (
+              <div
+                key={item.id}
+                onClick={() => handleItemClick(item)}
+                className={`bg-gray-800/40 backdrop-blur-sm border-2 border-gray-700/50 rounded-xl p-5 hover:bg-gray-700/40 hover:border-gray-600 hover:shadow-xl transition-all cursor-pointer group ${
+                  viewMode === "list" ? "flex items-center gap-4" : ""
+                }`}
+              >
+                <div className={`flex items-start ${viewMode === "list" ? "gap-4 flex-1" : "justify-between mb-4"}`}>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="p-2.5 bg-gray-700/50 rounded-xl group-hover:bg-gray-600/50 group-hover:scale-110 transition-all flex-shrink-0">
+                      {getItemIcon(item.type as ItemType[])}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-white font-semibold truncate mb-1 group-hover:text-blue-300 transition-colors">
+                        {item.name}
+                      </h3>
+                      <p className="text-xs text-gray-400 truncate flex items-center gap-1">
+                        {item.url ? (
+                          <>
+                            <Globe className="w-3 h-3 flex-shrink-0" />
+                            {item.url}
+                          </>
+                        ) : (
+                          "No URL"
+                        )}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className={`flex flex-wrap gap-2 ${viewMode === "list" ? "" : "mb-3"}`}>
-                {item.type.map((type, index) => (
-                  <span
-                    key={index}
-                    className={`px-2.5 py-1 text-xs font-medium rounded-lg ${getTypeColor(
-                      type
-                    )} border`}
-                  >
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </span>
-                ))}
-              </div>
 
-              {item.tags && item.tags.length > 0 && (
                 <div className={`flex flex-wrap gap-2 ${viewMode === "list" ? "" : "mb-3"}`}>
-                  {item.tags.slice(0, 3).map((tag, idx) => (
+                  {item.type.map((type, index) => (
                     <span
-                      key={idx}
-                      className="px-2.5 py-1 text-xs font-medium rounded-lg bg-gray-700/40 text-gray-300 border border-gray-600/30"
+                      key={index}
+                      className={`px-2.5 py-1 text-xs font-medium rounded-lg ${getTypeColor(
+                        type
+                      )} border`}
                     >
-                      #{tag}
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
                     </span>
                   ))}
-                  {item.tags.length > 3 && (
-                    <span className="px-2.5 py-1 text-xs font-medium rounded-lg bg-gray-700/40 text-gray-400 border border-gray-600/30">
-                      +{item.tags.length - 3} more
-                    </span>
-                  )}
                 </div>
-              )}
 
-              <div className="text-xs text-gray-500 flex items-center gap-1 pt-2 border-t border-gray-700/50">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Updated {new Date(item.updated_at).toLocaleDateString()}
+
+                {itemTags.length > 0 && (
+                  <div className={`flex flex-wrap gap-2 ${viewMode === "list" ? "" : "mb-3"}`}>
+                    {itemTags.slice(0, 3).map((tag, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2.5 py-1 text-xs font-medium rounded-lg bg-gray-700/40 text-gray-300 border border-gray-600/30"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                    {itemTags.length > 3 && (
+                      <span className="px-2.5 py-1 text-xs font-medium rounded-lg bg-gray-700/40 text-gray-400 border border-gray-600/30">
+                        +{itemTags.length - 3} more
+                      </span>
+                    )}
+                  </div>
+                )}
+
+
+                <div className="text-xs text-gray-500 flex items-center gap-1 pt-2 border-t border-gray-700/50">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Updated {new Date(item.updated_at).toLocaleDateString()}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
+
 
       {vaultId && (
         <AddingItemsModal
@@ -822,6 +883,7 @@ export const UnifiedVaultList: React.FC = () => {
           onSuccess={fetchItems}
         />
       )}
+
 
       <ViewItemModal
         isOpen={showViewModal}

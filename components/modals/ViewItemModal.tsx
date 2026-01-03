@@ -44,12 +44,10 @@ export const ViewItemModal: React.FC<ViewItemModalProps> = ({
   const [showMasterPassphraseModal, setShowMasterPassphraseModal] = useState(false);
   const [masterPassphrase, setMasterPassphrase] = useState<string | null>(null);
 
-  // Get vault ID based on type
   const vaultId = vaultType === 'personal' 
     ? user?.vault?.id 
     : item?.vault_id || null;
 
-  // Crypto chain
   const { umkCryptoKey, privateKeyBase64 } = useUserMasterKey(masterPassphrase);
   const { ovkCryptoKey } = useVaultOVK(
     umkCryptoKey,

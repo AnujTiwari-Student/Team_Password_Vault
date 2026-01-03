@@ -1,7 +1,9 @@
 "use client";
 
+
 import axios, { AxiosError } from "axios";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+
 
 interface ItemResponse {
   id: string; 
@@ -17,6 +19,7 @@ interface ItemResponse {
   updated_at: string;
 }
 
+
 interface ItemsApiResponse {
   items: ItemResponse[];
   count: number;
@@ -28,12 +31,14 @@ interface ItemsApiResponse {
   };
 }
 
+
 interface UseItemsReturn {
   items: ItemResponse[];
   loading: boolean;
   error: string | null;
   refetch: () => void;
 }
+
 
 export function useItems(
   vaultId: string,
@@ -45,7 +50,8 @@ export function useItems(
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchItems = async () => {
+
+  const fetchItems = useCallback(async () => {
     if (!vaultId) {
       setItems([]);
       setLoading(false);
@@ -53,13 +59,16 @@ export function useItems(
       return;
     }
 
+
     setLoading(true);
     setError(null);
+
 
     try {
       const params: Record<string, string> = {
         vault_id: vaultId,
       };
+
 
       if (searchQuery?.trim()) {
         params.q = searchQuery.trim();
@@ -73,11 +82,14 @@ export function useItems(
         params.tag = tagFilter.trim();
       }
 
+
       const response = await axios.get<ItemsApiResponse>(`/api/items`, {
         params,
       });
 
+
       const data = response.data;
+
 
       if (!data || !data.items || !Array.isArray(data.items)) {
         setItems([]);
@@ -85,8 +97,10 @@ export function useItems(
         return;
       }
 
+
       setItems(data.items);
       console.log(`Fetched ${data.count} items from vault ${data.vault_id}`);
+
 
     } catch (error) {
       console.error("Failed to fetch items:", error);
@@ -103,6 +117,7 @@ export function useItems(
           axiosError.response?.data?.error || 
           axiosError.message ||
           "Failed to fetch items";
+
 
         if (status === 401) {
           setError("Unauthorized - please log in");
@@ -122,11 +137,13 @@ export function useItems(
     } finally {
       setLoading(false);
     }
-  };
+  }, [vaultId, searchQuery, typeFilter, tagFilter]);
+
 
   useEffect(() => {
     fetchItems();
-  }, [vaultId, searchQuery, typeFilter, tagFilter]);
+  }, [fetchItems]);
+
 
   return {
     items,

@@ -7,6 +7,7 @@ import {
 } from "@/types/vault";
 import { getMembershipForOrg, type UserWithMemberships } from "@/utils/vault-helpers";
 import { Permission, ROLE_PERMISSIONS } from "@/constants/permission";
+import { SessionUser } from "@/types/session";
 
 function normalizeMemberships(
   member?: Membership | Membership[]
@@ -100,9 +101,27 @@ export function getUserOrgRole(
   return membership?.role ?? null;
 }
 
-export function canCreateOrg(user: UserWithMemberships | null): boolean {
-  return isAdmin(user) || isOrgOwner(user);
+type UserLike = Pick<SessionUser, "id" | "org" | "member">;
+
+export function canCreateOrg(user: UserLike | null): boolean {
+  if (!user) return false;
+
+  // org owner
+  if (user.org && "owner_user_id" in user.org && user.org.owner_user_id === user.id) {
+    return true;
+  }
+
+  const memberships = user.member
+    ? Array.isArray(user.member)
+      ? user.member
+      : [user.member]
+    : [];
+
+  return memberships.some(
+    (m) => m.role === "admin" || m.role === "owner"
+  );
 }
+
 
 export function canManageMembers(
   user: UserWithMemberships | null,

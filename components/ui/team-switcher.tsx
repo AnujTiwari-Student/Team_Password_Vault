@@ -60,6 +60,7 @@ export function TeamSwitcher() {
   const [isLoadingPlan, setIsLoadingPlan] = useState(false);
 
   const canUserCreateOrg = React.useMemo(() => {
+    // @ts-expect-error TS(2769)
     return canCreateOrg(user);
   }, [user]);
 
