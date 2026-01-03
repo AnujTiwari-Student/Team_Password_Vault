@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/db";
 import { currentUser } from "@/lib/current-user";
-import { razorpayInstance } from "@/lib/razorpay";
+import { getRazorpayInstance } from "@/lib/razorpay";
 
 type RazorpayOrderNotes = {
   user_id: string;
@@ -14,6 +14,16 @@ type RazorpayOrderNotes = {
 
 export async function POST(req: NextRequest) {
   try {
+    if (
+      !process.env.RAZORPAY_KEY_ID ||
+      !process.env.RAZORPAY_KEY_SECRET
+    ) {
+      return NextResponse.json(
+        { error: "Billing is not configured" },
+        { status: 503 }
+      );
+    }
+
     const user = await currentUser();
     if (!user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -27,7 +37,7 @@ export async function POST(req: NextRequest) {
     }
 
     const expectedSignature = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest("hex");
 
@@ -35,7 +45,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
     }
 
-    const payment = await razorpayInstance.payments.fetch(razorpay_payment_id);
+    const razorpay = getRazorpayInstance();
+
+    const payment = await razorpay.payments.fetch(razorpay_payment_id);
 
     if (
       payment.status !== "captured" ||
@@ -47,7 +59,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const order = await razorpayInstance.orders.fetch(razorpay_order_id);
+    const order = await razorpay.orders.fetch(razorpay_order_id);
     const notes = order.notes as RazorpayOrderNotes;
 
     if (!notes?.vault_id || !notes?.plan || !notes?.billing_cycle) {
@@ -87,7 +99,7 @@ export async function POST(req: NextRequest) {
     const nextBillingDate = new Date();
     if (notes.billing_cycle === "monthly") {
       nextBillingDate.setMonth(nextBillingDate.getMonth() + 1);
-    } else if (notes.billing_cycle === "yearly") {
+    } else {
       nextBillingDate.setFullYear(nextBillingDate.getFullYear() + 1);
     }
 
@@ -155,7 +167,7 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
   } catch (err) {
-    console.error("❌ Payment verification failed:", err);
+    console.error("Payment verification failed:", err);
     return NextResponse.json(
       { error: "Payment verification failed" },
       { status: 500 }
