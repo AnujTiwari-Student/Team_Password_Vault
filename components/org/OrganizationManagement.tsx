@@ -1,5 +1,6 @@
 "use client";
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Shield, 
@@ -45,10 +46,12 @@ import { FormError } from '../auth/form-error';
 import { FormSuccess } from '../auth/form-success';
 import { toast } from "sonner";
 
+
 interface OrganizationManagementProps {
   user: User;
   orgId: string;
 }
+
 
 interface OrganizationMember {
   id: string;
@@ -66,10 +69,21 @@ interface OrganizationMember {
   teams?: Team[];
 }
 
+
 interface TeamWithMembers extends Team {
   members: OrganizationMember[];
   member_count: number;
 }
+
+
+interface MembersResponse {
+  members: OrganizationMember[];
+}
+
+interface TeamsResponse {
+  teams: TeamWithMembers[];
+}
+
 
 export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ user, orgId }) => {
   const [members, setMembers] = useState<OrganizationMember[]>([]);
@@ -87,12 +101,14 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
   const [success, setSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = React.useTransition();
 
+
   const isOwnerOrAdmin = user?.org?.owner_user_id === user?.id || 
     members.find(m => m.user_id === user?.id)?.role === 'admin';
 
+
   const fetchMembers = useCallback(async (): Promise<void> => {
     try {
-      const response = await axios.get<APIResponse>(`/api/members?org_id=${orgId}`);
+      const response = await axios.get<APIResponse<MembersResponse>>(`/api/members?org_id=${orgId}`);
       if (response.data.success && response.data.data) {
         setMembers(response.data.data.members || []);
       }
@@ -103,9 +119,10 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
     }
   }, [orgId]);
 
+
   const fetchTeams = useCallback(async (): Promise<void> => {
     try {
-      const response = await axios.get<APIResponse>(`/api/teams?org_id=${orgId}&vault_id=${user.vault!.id}`);
+      const response = await axios.get<APIResponse<TeamsResponse>>(`/api/teams?org_id=${orgId}&vault_id=${user.vault!.id}`);
       if (response.data.success && response.data.data) {
         setTeams(response.data.data.teams || []);
       }
@@ -114,22 +131,27 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
     }
   }, [orgId, user.vault]);
 
+
   useEffect(() => {
     fetchMembers();
     fetchTeams();
   }, [fetchMembers, fetchTeams]);
 
+
   const handleRoleChange = async (newRole: string): Promise<void> => {
     if (!selectedMember) return;
+
 
     try {
       startTransition(async () => {
         setError(null);
         setSuccess(null);
 
+
         const response = await axios.patch<APIResponse>(`/api/members/${selectedMember.id}`, {
           role: newRole
         });
+
 
         if (response.data.success) {
           setSuccess(`Role updated to ${newRole} successfully!`);
@@ -154,15 +176,19 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
     }
   };
 
+
   const handleRemoveMember = async (): Promise<void> => {
     if (!selectedMember) return;
+
 
     try {
       startTransition(async () => {
         setError(null);
         setSuccess(null);
 
+
         const response = await axios.delete<APIResponse>(`/api/members/${selectedMember.id}`);
+
 
         if (response.data.success) {
           setSuccess('Member removed from organization successfully!');
@@ -187,15 +213,19 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
     }
   };
 
+
   const handleDeleteTeam = async (): Promise<void> => {
     if (!selectedTeam) return;
+
 
     try {
       startTransition(async () => {
         setError(null);
         setSuccess(null);
 
+
         const response = await axios.delete<APIResponse>(`/api/teams/${selectedTeam.id}`);
+
 
         if (response.data.success) {
           setSuccess('Team deleted successfully!');
@@ -220,6 +250,7 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
     }
   };
 
+
   const handleRemoveFromTeam = async (teamId: string, userId: string): Promise<void> => {
     try {
       const response = await axios.delete<APIResponse>(`/api/team-members/${teamId}/${userId}`);
@@ -233,12 +264,14 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
     }
   };
 
+
   const filteredMembers = members.filter(member => {
     const matchesSearch = member.user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.user.email?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === 'all' || member.role === roleFilter;
     return matchesSearch && matchesRole;
   });
+
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
@@ -254,6 +287,7 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
         return 'bg-gray-700/50 text-gray-400';
     }
   };
+
 
   if (!isOwnerOrAdmin) {
     return (
@@ -271,6 +305,7 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
     );
   }
 
+
   if (loading) {
     return (
       <div className="bg-gray-800 rounded-xl p-12 border border-gray-700">
@@ -285,6 +320,7 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
     );
   }
 
+
   return (
     <div className="space-y-8">
       <div>
@@ -298,6 +334,7 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
           Control your organization members, teams, and permissions
         </p>
       </div>
+
 
       <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
         <div className="px-6 py-5 border-b border-gray-700 bg-gray-800/50">
@@ -329,6 +366,7 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
           </div>
         </div>
 
+
         <div className="p-6">
           <div className="flex flex-col sm:flex-row gap-3 mb-6">
             <div className="relative flex-1">
@@ -357,6 +395,7 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
             )}
           </div>
 
+
           {activeTab === 'members' ? (
             <div>
               <div className="flex items-center justify-between mb-4">
@@ -364,6 +403,7 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
                   {filteredMembers.length} {filteredMembers.length === 1 ? 'Member' : 'Members'}
                 </h4>
               </div>
+
 
               {filteredMembers.length === 0 ? (
                 <div className="text-center py-16 bg-gray-750 rounded-lg border border-gray-700">
@@ -408,6 +448,7 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
                           </p>
                         </div>
                       </div>
+
 
                       <div className="flex items-center gap-3">
                         <span className={`px-3 py-1.5 text-xs font-semibold rounded-lg ${getRoleBadgeColor(member.role)}`}>
@@ -467,6 +508,7 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
                 </h4>
               </div>
 
+
               {teams.length === 0 ? (
                 <div className="text-center py-16 bg-gray-750 rounded-lg border border-gray-700">
                   <div className="w-16 h-16 bg-gray-700/30 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -497,6 +539,7 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
                             </p>
                           </div>
                         </div>
+
 
                         <div className="flex items-center gap-3">
                           <div className="bg-gray-700 px-3 py-1.5 rounded-lg">
@@ -546,6 +589,7 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
                         </div>
                       </div>
 
+
                       {team.members && team.members.length > 0 && (
                         <div className="p-5 bg-gray-800/30 border-t border-gray-700">
                           <p className="text-xs font-semibold text-gray-300 mb-3 uppercase tracking-wide">Team Members</p>
@@ -585,6 +629,7 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
         </div>
       </div>
 
+
       <Dialog open={showRoleModal} onOpenChange={setShowRoleModal}>
         <DialogContent className="sm:max-w-md bg-gray-900 border-gray-700 text-white">
           <DialogHeader>
@@ -593,6 +638,7 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
               Change Member Role
             </DialogTitle>
           </DialogHeader>
+
 
           <div className="space-y-5">
             {selectedMember && (
@@ -608,6 +654,7 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
                 </p>
               </div>
             )}
+
 
             <div>
               <label className="text-sm font-medium text-gray-300 mb-2 block">New Role</label>
@@ -629,8 +676,10 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
               </Select>
             </div>
 
+
             <FormError message={error} />
             <FormSuccess message={success} />
+
 
             <Button
               variant="outline"
@@ -649,6 +698,7 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
         </DialogContent>
       </Dialog>
 
+
       <Dialog open={showRemoveMemberModal} onOpenChange={setShowRemoveMemberModal}>
         <DialogContent className="sm:max-w-md bg-gray-900 border-gray-700 text-white">
           <DialogHeader>
@@ -657,6 +707,7 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
               Remove Member
             </DialogTitle>
           </DialogHeader>
+
 
           <div className="space-y-5">
             {selectedMember && (
@@ -670,8 +721,10 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
               </div>
             )}
 
+
             <FormError message={error} />
             <FormSuccess message={success} />
+
 
             <div className="flex gap-3">
               <Button
@@ -706,6 +759,7 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
         </DialogContent>
       </Dialog>
 
+
       <Dialog open={showDeleteTeamModal} onOpenChange={setShowDeleteTeamModal}>
         <DialogContent className="sm:max-w-md bg-gray-900 border-gray-700 text-white">
           <DialogHeader>
@@ -714,6 +768,7 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
               Delete Team
             </DialogTitle>
           </DialogHeader>
+
 
           <div className="space-y-5">
             {selectedTeam && (
@@ -727,8 +782,10 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
               </div>
             )}
 
+
             <FormError message={error} />
             <FormSuccess message={success} />
+
 
             <div className="flex gap-3">
               <Button
@@ -765,4 +822,3 @@ export const OrganizationManagement: React.FC<OrganizationManagementProps> = ({ 
     </div>
   );
 };
-  

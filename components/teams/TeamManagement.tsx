@@ -1,5 +1,6 @@
 "use client";
 
+
 import React, { useState, useEffect, useCallback } from "react";
 import { Users, Plus, UserPlus, AlertCircle, UserX } from "lucide-react";
 import axios from "axios";
@@ -11,10 +12,12 @@ import { AddMemberModal } from "./AddMemberModal";
 import { TeamCard } from "./TeamCard";
 import Image from "next/image";
 
+
 interface TeamManagementProps {
   vault: Vault | null | undefined;
   user: User | null | undefined;
 }
+
 
 interface OrganizationMember {
   id: string;
@@ -31,6 +34,16 @@ interface OrganizationMember {
   };
 }
 
+
+interface TeamsResponse {
+  teams: Team[];
+}
+
+interface MembersResponse {
+  members: OrganizationMember[];
+}
+
+
 export const TeamManagement: React.FC<TeamManagementProps> = ({
   vault,
   user,
@@ -45,6 +58,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [membersError, setMembersError] = useState<string | null>(null);
 
+
   const hasValidVault = vault && vault.id;
   const hasValidOrg = vault?.org_id && user?.org?.id;
   const isOrgVault = vault?.type === "org";
@@ -52,20 +66,23 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
   const vaultId = vault?.id;
   const vaultOrgId = vault?.org_id;
 
+
   const fetchTeams = useCallback(async (): Promise<void> => {
     if (!vaultOrgId || !vaultId) {
       setLoading(false);
       return;
     }
 
+
     try {
       setFetchError(null);
-      const response = await axios.get<APIResponse>(
+      const response = await axios.get<APIResponse<TeamsResponse>>(
         `/api/teams?org_id=${vaultOrgId}&vault_id=${vaultId}`
       );
 
-      if (response.data.success) {
-        const teamsData = response.data.data?.teams || [];
+
+      if (response.data.success && response.data.data) {
+        const teamsData = response.data.data.teams || [];
         setTeams(teamsData);
         if (teamsData.length > 0) {
           setSelectedTeam(teamsData[0]);
@@ -97,19 +114,23 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
     }
   }, [vaultOrgId, vaultId]);
 
+
   const fetchOrgMembers = useCallback(async (): Promise<void> => {
     if (!orgId) {
       setMembersLoading(false);
       return;
     }
 
+
     try {
       setMembersError(null);
       setMembersLoading(true);
 
-      const response = await axios.get<APIResponse>(
+
+      const response = await axios.get<APIResponse<MembersResponse>>(
         `/api/members?org_id=${orgId}`
       );
+
 
       if (response.data.success && response.data.data) {
         const membersData = response.data.data.members || [];
@@ -145,6 +166,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
     }
   }, [orgId]);
 
+
   useEffect(() => {
     if (hasValidVault && hasValidOrg && vaultId && vaultOrgId) {
       fetchTeams();
@@ -155,16 +177,19 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
     }
   }, [hasValidVault, hasValidOrg, vaultId, vaultOrgId, fetchTeams, fetchOrgMembers]);
 
+
   const handleTeamCreated = (newTeam: Team): void => {
     setTeams((prev) => [...prev, newTeam]);
     setSelectedTeam(newTeam);
     setShowCreateTeam(false);
   };
 
+
   const handleMemberAdded = (): void => {
     fetchOrgMembers();
     setShowAddMember(false);
   };
+
 
   const retryFetchTeams = () => {
     setFetchError(null);
@@ -172,10 +197,12 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
     fetchTeams();
   };
 
+
   const retryFetchMembers = () => {
     setMembersError(null);
     fetchOrgMembers();
   };
+
 
   if (!vault) {
     return (
@@ -195,6 +222,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
     );
   }
 
+
   if (!user) {
     return (
       <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
@@ -212,6 +240,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
       </div>
     );
   }
+
 
   if (!hasValidVault || !isOrgVault) {
     return (
@@ -231,6 +260,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
     );
   }
 
+
   if (!hasValidOrg) {
     return (
       <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
@@ -249,6 +279,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
     );
   }
 
+
   if (loading) {
     return (
       <div className="bg-gray-800 rounded-xl p-12 border border-gray-700">
@@ -263,6 +294,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
     );
   }
 
+
   return (
     <div className="space-y-8">
       <div>
@@ -276,6 +308,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
           Organize vault access and collaboration with teams
         </p>
       </div>
+
 
       <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
         <div className="px-6 py-5 border-b border-gray-700 bg-gray-800/50">
@@ -306,6 +339,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
             </div>
           </div>
         </div>
+
 
         <div className="p-6">
           {fetchError ? (
@@ -360,6 +394,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
         </div>
       </div>
 
+
       <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
         <div className="px-6 py-5 border-b border-gray-700 bg-gray-800/50">
           <div className="flex items-center justify-between">
@@ -386,6 +421,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
             )}
           </div>
         </div>
+
 
         <div className="p-6">
           {membersLoading ? (
@@ -490,6 +526,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
         </div>
       </div>
 
+
       {vaultOrgId && vaultId && (
         <CreateTeamModal
           isOpen={showCreateTeam}
@@ -499,6 +536,7 @@ export const TeamManagement: React.FC<TeamManagementProps> = ({
           vaultId={vaultId}
         />
       )}
+
 
       {orgId && (
         <AddMemberModal
