@@ -1,4 +1,3 @@
-import { ItemType } from "@prisma/client";
 import * as z from "zod";
 
 const ERR_PASSWORD_REQ = "Password doesn't meet requirements";
@@ -28,7 +27,7 @@ export const RegisterSchema = z.object({
   confirmPassword: z.string(),
 }).strict().refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
-})
+});
 
 export const AccountTypeValidationSchema = z.object({
     orgName: z
@@ -72,6 +71,7 @@ export const VaultCreationSchema = z.object({
 
 export type VaultCreationType = z.infer<typeof VaultCreationSchema>;
 
+// Define ItemType enum locally
 export const ITEM_TYPES = ["login", "note", "totp"] as const;
 export type ItemTypeEnum = typeof ITEM_TYPES[number];
 
@@ -84,7 +84,7 @@ export const ItemCreationSchema = z.object({
     totp_seed_ct: z.string().optional(),
     vaultId: z.string(),
     item_key_wrapped: z.string().optional(),
-    type: z.array(z.enum(ItemType)).min(1, "At least one item type is required"),
+    type: z.array(z.enum(ITEM_TYPES)).min(1, "At least one item type is required"), // Fixed line
     tags: z.array(z.string()).optional(),
     notes_ct: z.string().optional(),
     created_by: z.string()
@@ -125,5 +125,3 @@ export const CreateOrgSchema = z.object({
 });
 
 export type CreateOrgSchemaType = z.infer<typeof CreateOrgSchema>;
-
-

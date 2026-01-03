@@ -1,22 +1,24 @@
-import { Prisma } from '@prisma/client';
+import { Prisma } from "@prisma/client";
 
 export const userWithRelations = Prisma.validator<Prisma.UserDefaultArgs>()({
   include: {
     vaults: true,
     orgs: {
       include: {
-        vaults: true
-      }
+        vaults: true,
+      },
     },
     memberships: {
       include: {
-        org: true
-      }
-    }
-  }
+        org: true,
+      },
+    },
+  },
 });
 
-export type UserWithRelations = Prisma.UserGetPayload<typeof userWithRelations>;
+export type UserWithRelations = Prisma.UserGetPayload<
+  typeof userWithRelations
+>;
 
 export type OrgWithVault = {
   id: string;
