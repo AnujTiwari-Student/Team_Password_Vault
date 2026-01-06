@@ -144,6 +144,7 @@ export const unwrapKey = async (
         ["encrypt", "decrypt", "wrapKey", "unwrapKey"]
       );
     } catch (error) {
+      console.error("Unwrap key with RSA error:", error);
       throw new Error("Failed to unwrap key with RSA private key");
     }
   }
@@ -198,6 +199,7 @@ export const unwrapKey = async (
       );
     }
   } catch (error) {
+    console.error("Unwrap key error:", error);
     throw new Error("Failed to unwrap key with AES key");
   }
 };
