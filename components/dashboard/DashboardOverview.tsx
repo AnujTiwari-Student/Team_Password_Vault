@@ -40,7 +40,6 @@ export const DashboardOverview: React.FC = () => {
   const [isLoadingStats, setIsLoadingStats] = useState(true);
   const [isLoadingActivity, setIsLoadingActivity] = useState(true);
   
-  // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
@@ -95,7 +94,6 @@ export const DashboardOverview: React.FC = () => {
     return "Poor";
   };
 
-  // Pagination logic
   const totalPages = Math.ceil(recentActivity.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
