@@ -6,6 +6,7 @@ type VaultType = 'org' | 'personal' | undefined;
 
 interface OrgVaultResponse {
   ovk_wrapped_for_user: string;
+  wrap_type: 'aes' | 'rsa';
   org_id: string;
 }
 
@@ -24,7 +25,6 @@ export function useVaultOVK(
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Reset state if required params are missing
     if (!id || !umkCryptoKey || !vaultType) {
       setOvkCryptoKey(null);
       setError(null);
@@ -36,39 +36,37 @@ export function useVaultOVK(
         setError(null);
 
         if (vaultType === 'org') {
-          // Validate required params for org vault
-          if (!privateKeyBase64) {
-            throw new Error('Private key required for org vault');
-          }
-
           if (!orgId) {
             throw new Error('Organization ID required for org vault');
           }
-
-          console.log('🔐 Fetching org vault OVK:', { vaultId: id, orgId });
 
           const response = await axios.get<OrgVaultResponse>(`/api/vaults/org`, {
             params: { id, org_id: orgId },
           });
 
-          const { ovk_wrapped_for_user, org_id: responseOrgId } = response.data;
+          const { ovk_wrapped_for_user, wrap_type } = response.data;
           
           if (!ovk_wrapped_for_user) {
             throw new Error('OVK wrapped for user missing in response');
           }
 
-          // Just log a warning instead of throwing error
-          if (responseOrgId !== orgId) {
-            console.warn('⚠️ Org ID mismatch - Expected:', orgId, 'Got:', responseOrgId);
+          let unwrappedKey: CryptoKey;
+
+          if (wrap_type === 'rsa') {
+            if (!privateKeyBase64) {
+              throw new Error('Private key required for RSA unwrapping');
+            }
+            unwrappedKey = await unwrapKey(ovk_wrapped_for_user, privateKeyBase64);
+          } else {
+            if (!umkCryptoKey) {
+              throw new Error('UMK required for AES unwrapping');
+            }
+            unwrappedKey = await unwrapKey(ovk_wrapped_for_user, umkCryptoKey);
           }
 
-          console.log('🔓 Unwrapping org vault OVK...');
-          const unwrappedKey = await unwrapKey(ovk_wrapped_for_user, privateKeyBase64);
           setOvkCryptoKey(unwrappedKey);
-          console.log('✅ Org vault OVK unwrapped successfully');
 
         } else if (vaultType === 'personal') {
-          console.log('🔐 Fetching personal vault OVK:', { vaultId: id });
 
           const response = await axios.get<PersonalVaultResponse>(`/api/vaults/personal`, {
             params: { id },
@@ -79,10 +77,12 @@ export function useVaultOVK(
             throw new Error('OVK cipher missing in response');
           }
 
-          console.log('🔓 Unwrapping personal vault OVK...');
-          const unwrappedKey = await unwrapKey(ovk_cipher, umkCryptoKey!);
+          if (!umkCryptoKey) {
+            throw new Error('UMK required for personal vault unwrapping');
+          }
+
+          const unwrappedKey = await unwrapKey(ovk_cipher, umkCryptoKey);
           setOvkCryptoKey(unwrappedKey);
-          console.log('✅ Personal vault OVK unwrapped successfully');
         } else {
           throw new Error(`Invalid vault type: ${vaultType}`);
         }
@@ -101,24 +101,10 @@ export function useVaultOVK(
             axiosError.message ||
             'No error message from server';
           
-          const statusCode = axiosError.response?.status;
-          
           setError(errorMsg);
-          console.error(
-            `❌ Failed to fetch OVK (${statusCode || 'unknown'}):`,
-            errorMsg,
-            {
-              vaultId: id,
-              vaultType,
-              orgId,
-              hasPrivateKey: !!privateKeyBase64,
-              hasUmk: !!umkCryptoKey
-            }
-          );
         } else {
           const err = error as Error;
           setError(err.message);
-          console.error(`❌ Error during OVK unwrapping:`, err.message, err);
         }
         setOvkCryptoKey(null);
       }

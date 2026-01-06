@@ -18,15 +18,12 @@ export async function GET(req: NextRequest) {
     const vaultId = searchParams.get('vault_id');
     const orgId = searchParams.get('org_id');
 
-    console.log('🔐 [/api/items/member-items] Called:', { vaultId, orgId, userId: user.id });
-
     if (!vaultId || !orgId) {
       return NextResponse.json({ 
         message: 'Vault ID and Organization ID are required' 
       }, { status: 400 });
     }
 
-    // Check if user is member of this organization
     const membership = await prisma.membership.findFirst({
       where: {
         user_id: user.id,
@@ -34,7 +31,6 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    // Check if user is org owner
     const org = await prisma.org.findUnique({
       where: { id: orgId },
       select: {
@@ -45,19 +41,12 @@ export async function GET(req: NextRequest) {
 
     const isOrgOwner = org?.owner_user_id === user.id;
 
-    console.log('👤 Access check:', { 
-      hasMembership: !!membership, 
-      isOrgOwner,
-      role: membership?.role || (isOrgOwner ? 'owner' : null)
-    });
-
     if (!membership && !isOrgOwner) {
       return NextResponse.json({ 
         message: 'You are not a member of this organization' 
       }, { status: 403 });
     }
 
-    // Verify the vault exists and belongs to this org
     const vault = await prisma.vault.findFirst({
       where: { 
         id: vaultId,
@@ -66,15 +55,12 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    console.log('🗄️ Vault check:', vault ? `Found (${vault.id})` : 'Not found');
-
     if (!vault) {
       return NextResponse.json({ 
         message: 'Vault not found or does not belong to this organization' 
       }, { status: 404 });
     }
 
-    // Build query filters
     const searchQuery = searchParams.get('q');
     const typeFilter = searchParams.get('type');
     const tagFilter = searchParams.get('tag');
@@ -111,7 +97,6 @@ export async function GET(req: NextRequest) {
       };
     }
 
-    // Fetch items
     const items = await prisma.item.findMany({ 
       where: whereClause,
       select: { 
@@ -132,8 +117,6 @@ export async function GET(req: NextRequest) {
       orderBy: { updated_at: 'desc' }
     });
 
-    console.log('✅ Items fetched:', items.length);
-
     return NextResponse.json({
       items,
       count: items.length,
@@ -151,7 +134,6 @@ export async function GET(req: NextRequest) {
     }, { status: 200 });
 
   } catch (error) {
-    console.error("❌ Organization items list error:", error);
     return NextResponse.json({ 
       message: 'Internal Server Error',
       error: process.env.NODE_ENV === 'development' ? String(error) : undefined

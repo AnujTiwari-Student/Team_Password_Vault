@@ -3,60 +3,52 @@ import { prisma } from "@/db";
 import { currentUser } from "@/lib/current-user";
 
 export async function POST(request: Request) {
-  const user = await currentUser();
-
-  if (!user || !user.id || !user.email) {
-    return NextResponse.json(
-      { error: "Unauthorized or missing session data" },
-      { status: 401 }
-    );
-  }
-
-  const userId = user.id;
-
-  const body = await request.json();
-  const {
-    umk_salt,
-    master_passphrase_verifier,
-    ovk_wrapped_for_user,
-    ovk_raw,
-    ovk_wrapped_for_org,
-    org_name,
-    account_type,
-    public_key, 
-    wrapped_private_key,
-  } = body;
-
-  if (
-    !umk_salt ||
-    !master_passphrase_verifier ||
-    !ovk_wrapped_for_user ||
-    !account_type ||
-    !public_key || 
-    !wrapped_private_key
-  ) {
-    console.warn(
-      "Received incomplete key material for setup:",
-      Object.keys(body)
-    );
-    return NextResponse.json(
-      {
-        error: "Missing required client-side generated key materials.",
-      },
-      { status: 400 }
-    );
-  }
-
-  if (account_type === "org" && (!org_name || !ovk_raw || !ovk_wrapped_for_org)) {
-    return NextResponse.json(
-      {
-        error: "Organization setup requires org_name, ovk_raw, and ovk_wrapped_for_org.",
-      },
-      { status: 400 }
-    );
-  }
-
   try {
+    const user = await currentUser();
+
+    if (!user || !user.id || !user.email) {
+      return NextResponse.json(
+        { error: "Unauthorized or missing session data" },
+        { status: 401 }
+      );
+    }
+
+    const userId = user.id;
+    const body = await request.json();
+
+    const {
+      umk_salt,
+      master_passphrase_verifier,
+      ovk_wrapped_for_user,
+      ovk_raw,
+      ovk_wrapped_for_org,
+      org_name,
+      account_type,
+      public_key,
+      wrapped_private_key,
+    } = body;
+
+    if (
+      !umk_salt ||
+      !master_passphrase_verifier ||
+      !ovk_wrapped_for_user ||
+      !account_type ||
+      !public_key ||
+      !wrapped_private_key
+    ) {
+      return NextResponse.json(
+        { error: "Missing required client-side generated key materials." },
+        { status: 400 }
+      );
+    }
+
+    if (account_type === "org" && (!org_name || !ovk_raw || !ovk_wrapped_for_org)) {
+      return NextResponse.json(
+        { error: "Organization setup requires org_name, ovk_raw, and ovk_wrapped_for_org." },
+        { status: 400 }
+      );
+    }
+
     const result = await prisma.$transaction(async (tx) => {
       let newOrg;
 
@@ -78,9 +70,9 @@ export async function POST(request: Request) {
           subject_type: "CRYPTO_SETUP",
           meta: {
             wrapped_private_key: wrapped_private_key,
-            setup_timestamp: new Date().toISOString()
-          }
-        }
+            setup_timestamp: new Date().toISOString(),
+          },
+        },
       });
 
       if (account_type === "org") {
@@ -107,7 +99,7 @@ export async function POST(request: Request) {
           },
         });
 
-        const vault = await tx.vault.create({
+        await tx.vault.create({
           data: {
             org_id: newOrg.id,
             name: `${org_name} Vault`,
@@ -129,41 +121,48 @@ export async function POST(request: Request) {
             meta: {
               ownerEmail: updatedUser.email,
               orgName: org_name,
-              vaultName: vault.name,
             },
           },
         });
       } else if (account_type === "personal") {
-        const personalVaultKey = await tx.personalVaultKey.create({
-          data: {
+        const existingVault = await tx.vault.findFirst({
+          where: {
             user_id: userId,
-            ovk_cipher: ovk_wrapped_for_user,
-          },
-        });
-
-        const vault = await tx.vault.create({
-          data: {
-            name: "Personal Vault",
             type: "personal",
-            user_id: userId,
-            ovk_id: personalVaultKey.id,
-            personalVaultKeyId: personalVaultKey.id,
           },
         });
 
-        await tx.logs.create({
-          data: {
-            user_id: userId,
-            action: "PERSONAL_SETUP",
-            ip: request.headers.get("x-forwarded-for") || "unknown",
-            ua: request.headers.get("user-agent") || "unknown",
-            subject_type: "PERSONAL_VAULT_SETUP",
-            meta: {
-              ownerEmail: updatedUser.email,
-              vaultName: vault.name,
+        if (!existingVault) {
+          const personalVaultKey = await tx.personalVaultKey.create({
+            data: {
+              user_id: userId,
+              ovk_cipher: ovk_raw || ovk_wrapped_for_user,
             },
-          },
-        });
+          });
+
+          await tx.vault.create({
+            data: {
+              name: `${updatedUser.name || updatedUser.email}'s Vault`,
+              type: "personal",
+              user_id: userId,
+              ovk_id: personalVaultKey.id,
+              personalVaultKeyId: personalVaultKey.id,
+            },
+          });
+
+          await tx.logs.create({
+            data: {
+              user_id: userId,
+              action: "PERSONAL_SETUP",
+              ip: request.headers.get("x-forwarded-for") || "unknown",
+              ua: request.headers.get("user-agent") || "unknown",
+              subject_type: "PERSONAL_VAULT_SETUP",
+              meta: {
+                ownerEmail: updatedUser.email,
+              },
+            },
+          });
+        }
       }
 
       return [updatedUser, newOrg];
@@ -171,7 +170,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        message: "Setup complete: Master Passphrase, User, Org, and Membership created.",
+        message: "Setup complete",
         result,
         orgId: result[1]?.id || null,
       },
@@ -181,7 +180,10 @@ export async function POST(request: Request) {
     console.error("Critical setup transaction failed:", error);
     return NextResponse.json(
       {
-        error: "Server error during critical setup. Setup failed.",
+        error: "Server error during setup",
+        details: process.env.NODE_ENV === "development" 
+          ? (error instanceof Error ? error.message : String(error))
+          : undefined,
       },
       { status: 500 }
     );

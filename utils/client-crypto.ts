@@ -144,7 +144,6 @@ export const unwrapKey = async (
         ["encrypt", "decrypt", "wrapKey", "unwrapKey"]
       );
     } catch (error) {
-      console.error("RSA unwrapping failed:", error);
       throw new Error("Failed to unwrap key with RSA private key");
     }
   }
@@ -154,7 +153,6 @@ export const unwrapKey = async (
     const wrappedKeyView = new Uint8Array(wrappedKeyWithIv);
 
     if (wrappedKeyView.byteLength > 500) {
-      console.log("Unwrapping RSA private key with AES UMK");
       
       if (wrappedKeyView.byteLength < 13) {
         throw new Error("Wrapped private key data too short");
@@ -177,7 +175,6 @@ export const unwrapKey = async (
         ["decrypt"]
       );
     } else {
-      console.log("Unwrapping AES key with UMK");
       
       if (wrappedKeyView.byteLength < 13) {
         throw new Error("Wrapped AES key data too short");
@@ -201,7 +198,6 @@ export const unwrapKey = async (
       );
     }
   } catch (error) {
-    console.error("AES unwrapping failed:", error);
     throw new Error("Failed to unwrap key with AES key");
   }
 };
@@ -269,7 +265,6 @@ export const importRSAPrivateKey = async (privateKeyBase64: string): Promise<Cry
   );
 };
 
-
 export const encryptWithRSA = async (data: string, publicKeyBase64: string): Promise<string> => {
   const publicKeyBuffer = base64ToArrayBuffer(publicKeyBase64);
   const publicKey = await window.crypto.subtle.importKey(
@@ -302,5 +297,3 @@ export const decryptWithRSA = async (encryptedData: string, privateKeyBase64: st
   
   return bufferToBase64(decryptedBuffer);
 };
-
-
