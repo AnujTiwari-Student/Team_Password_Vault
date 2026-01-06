@@ -73,14 +73,8 @@ export async function GET(request: NextRequest): Promise<NextResponse<APIRespons
   }
 }
 
-interface RouteContext {
-  params: Promise<{ memberId: string }>;
-}
-
 export async function DELETE(request: NextRequest): Promise<NextResponse<APIResponse>> {
   try {
-    console.log("DELETE request received");
-    
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({
@@ -91,10 +85,6 @@ export async function DELETE(request: NextRequest): Promise<NextResponse<APIResp
 
     const url = new URL(request.url);
     const memberId = url.searchParams.get('id');
-
-    console.log("Full URL:", request.url);
-    console.log("Search params:", Object.fromEntries(url.searchParams));
-    console.log("Member ID from searchParams:", memberId);
 
     if (!memberId) {
       return NextResponse.json({
@@ -182,11 +172,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse<APIResp
   }
 }
 
-
-export async function PATCH(
-  request: NextRequest,
-  context: RouteContext
-): Promise<NextResponse<APIResponse>> {
+export async function PATCH(request: NextRequest): Promise<NextResponse<APIResponse>> {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -196,13 +182,13 @@ export async function PATCH(
       }, { status: 401 });
     }
 
-    const resolvedParams = await context.params;
-    const memberId = resolvedParams?.memberId;
+    const url = new URL(request.url);
+    const memberId = url.searchParams.get('id');
     
-    if (!memberId || typeof memberId !== 'string') {
+    if (!memberId) {
       return NextResponse.json({
         success: false,
-        errors: { _form: ["Invalid member ID"] }
+        errors: { _form: ["Member ID is required"] }
       }, { status: 400 });
     }
 
@@ -295,4 +281,3 @@ export async function PATCH(
     }, { status: 500 });
   }
 }
-
